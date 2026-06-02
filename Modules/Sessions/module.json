@@ -1,0 +1,11 @@
+{
+    "name": "Sessions",
+    "alias": "sessions",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\Sessions\\Providers\\SessionsServiceProvider"
+    ],
+    "files": []
+}

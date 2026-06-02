@@ -1,0 +1,14 @@
+vendor/
+node_modules/
+database/database.sqlite
+storage/
+bootstrap/cache/
+.env
+.php-cs-fixer.php
+.phpstorm.meta.php
+*.log
+.git/
+.gitignore
+.github/
+.agents/
+AGENTS.md

@@ -1,0 +1,30 @@
+{
+    "name": "nwidart/recommendations",
+    "description": "",
+    "authors": [
+        {
+            "name": "Nicolas Widart",
+            "email": "n.widart@gmail.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {
+
+            }
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\Recommendations\\": "app/",
+            "Modules\\Recommendations\\Database\\Factories\\": "Database/Factories/",
+            "Modules\\Recommendations\\Database\\Seeders\\": "Database/Seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\Recommendations\\Tests\\": "tests/"
+        }
+    }
+}

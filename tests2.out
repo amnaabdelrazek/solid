@@ -1,0 +1,230 @@
+﻿
+   PASS  Tests\Unit\ExampleTest
+  Γ£ô that true is true
+
+   FAIL  Tests\Unit\Groups\GroupMatchingServiceTest
+  Γ¿» single category userΓÇª 0.32s  
+  Γ¿» mixed group createdΓÇª  0.09s  
+  Γ¿» group ready event diΓÇª 0.09s  
+
+   FAIL  Tests\Unit\Sessions\SessionServiceTest
+  Γ¿» throws when session not live
+  Γ¿» throws when user not group member
+  Γ¿» throws when paid session has no payment
+  Γ¿» returns jitsi result on successful join
+
+   FAIL  Tests\Feature\Auth\AuthTest
+  Γ¿» user can register     0.24s  
+  Γ¿» user can login        0.09s  
+  Γ¿» login fails with wroΓÇª 0.09s  
+  Γ¿» me returns authenticΓÇª 0.08s  
+  Γ¿» duplicate mobile regΓÇª 0.11s  
+
+   PASS  Tests\Feature\ExampleTest
+  Γ£ô the application retuΓÇª 0.11s  
+  ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ  
+   FAILED  Tests\UnitΓÇª  Error   
+  Class "Database\Factories\Modules\User\Models\UserFactory" not found
+
+  at vendor\laravel\framework\src\Illuminate\Database\Eloquent\Factories\Factory.php:1014
+    1010Γûò     public static function factoryForModel(string $modelName)
+    1011Γûò     {
+    1012Γûò         $factory = static::resolveFactoryName($modelName);
+    1013Γûò 
+  Γ₧£ 1014Γûò         return $factory::new();
+    1015Γûò     }
+    1016Γûò 
+    1017Γûò     /**
+    1018Γûò      * Specify the callback that should be invoked to guess factory names based on dynamic relationship names.
+
+  1   vendor\laravel\framework\src\Illuminate\Database\Eloquent\Factories\Factory.php:1014
+  2   vendor\laravel\framework\src\Illuminate\Database\Eloquent\Factories\HasFactory.php:21
+
+  ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ  
+   FAILED  Tests\UnitΓÇª  Error   
+  Class "Database\Factories\Modules\User\Models\UserFactory" not found
+
+  at vendor\laravel\framework\src\Illuminate\Database\Eloquent\Factories\Factory.php:1014
+    1010Γûò     public static function factoryForModel(string $modelName)
+    1011Γûò     {
+    1012Γûò         $factory = static::resolveFactoryName($modelName);
+    1013Γûò 
+  Γ₧£ 1014Γûò         return $factory::new();
+    1015Γûò     }
+    1016Γûò 
+    1017Γûò     /**
+    1018Γûò      * Specify the callback that should be invoked to guess factory names based on dynamic relationship names.
+
+  1   vendor\laravel\framework\src\Illuminate\Database\Eloquent\Factories\Factory.php:1014
+  2   vendor\laravel\framework\src\Illuminate\Database\Eloquent\Factories\HasFactory.php:21
+
+  ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ  
+   FAILED  Tests\UnitΓÇª  Error   
+  Class "Database\Factories\Modules\User\Models\UserFactory" not found
+
+  at vendor\laravel\framework\src\Illuminate\Database\Eloquent\Factories\Factory.php:1014
+    1010Γûò     public static function factoryForModel(string $modelName)
+    1011Γûò     {
+    1012Γûò         $factory = static::resolveFactoryName($modelName);
+    1013Γûò 
+  Γ₧£ 1014Γûò         return $factory::new();
+    1015Γûò     }
+    1016Γûò 
+    1017Γûò     /**
+    1018Γûò      * Specify the callback that should be invoked to guess factory names based on dynamic relationship names.
+
+  1   vendor\laravel\framework\src\Illuminate\Database\Eloquent\Factories\Factory.php:1014
+  2   vendor\laravel\framework\src\Illuminate\Database\Eloquent\Factories\HasFactory.php:21
+
+  ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ  
+   FAILED  Tests\UΓÇª  Exception   
+  The class \Modules\Sessions\Services\JitsiTokenService is marked final and its methods cannot be replaced. Classes marked final can be passed in to \Mockery::mock() as instantiated objects to create a partial mock, but only if the mock is not subject to type hinting checks.
+
+  at tests\Unit\Sessions\SessionServiceTest.php:40
+     36Γûò 
+     37Γûò         $this->sessionRepo = Mockery::mock(SessionRepositoryInterface::class);
+     38Γûò         $this->memberRepo = Mockery::mock(GroupMemberRepositoryInterface::class);
+     39Γûò         $this->paymentRepo = Mockery::mock(PaymentRepositoryInterface::class);
+  Γ₧£  40Γûò         $this->jitsiService = Mockery::mock(JitsiTokenService::class);
+     41Γûò 
+     42Γûò         $this->service = new SessionService(
+     43Γûò             $this->sessionRepo,
+     44Γûò             $this->memberRepo,
+
+  ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ  
+   FAILED  Tests\UΓÇª  Exception   
+  The class \Modules\Sessions\Services\JitsiTokenService is marked final and its methods cannot be replaced. Classes marked final can be passed in to \Mockery::mock() as instantiated objects to create a partial mock, but only if the mock is not subject to type hinting checks.
+
+  at tests\Unit\Sessions\SessionServiceTest.php:40
+     36Γûò 
+     37Γûò         $this->sessionRepo = Mockery::mock(SessionRepositoryInterface::class);
+     38Γûò         $this->memberRepo = Mockery::mock(GroupMemberRepositoryInterface::class);
+     39Γûò         $this->paymentRepo = Mockery::mock(PaymentRepositoryInterface::class);
+  Γ₧£  40Γûò         $this->jitsiService = Mockery::mock(JitsiTokenService::class);
+     41Γûò 
+     42Γûò         $this->service = new SessionService(
+     43Γûò             $this->sessionRepo,
+     44Γûò             $this->memberRepo,
+
+  ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ  
+   FAILED  Tests\UΓÇª  Exception   
+  The class \Modules\Sessions\Services\JitsiTokenService is marked final and its methods cannot be replaced. Classes marked final can be passed in to \Mockery::mock() as instantiated objects to create a partial mock, but only if the mock is not subject to type hinting checks.
+
+  at tests\Unit\Sessions\SessionServiceTest.php:40
+     36Γûò 
+     37Γûò         $this->sessionRepo = Mockery::mock(SessionRepositoryInterface::class);
+     38Γûò         $this->memberRepo = Mockery::mock(GroupMemberRepositoryInterface::class);
+     39Γûò         $this->paymentRepo = Mockery::mock(PaymentRepositoryInterface::class);
+  Γ₧£  40Γûò         $this->jitsiService = Mockery::mock(JitsiTokenService::class);
+     41Γûò 
+     42Γûò         $this->service = new SessionService(
+     43Γûò             $this->sessionRepo,
+     44Γûò             $this->memberRepo,
+
+  ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ  
+   FAILED  Tests\UΓÇª  Exception   
+  The class \Modules\Sessions\Services\JitsiTokenService is marked final and its methods cannot be replaced. Classes marked final can be passed in to \Mockery::mock() as instantiated objects to create a partial mock, but only if the mock is not subject to type hinting checks.
+
+  at tests\Unit\Sessions\SessionServiceTest.php:40
+     36Γûò 
+     37Γûò         $this->sessionRepo = Mockery::mock(SessionRepositoryInterface::class);
+     38Γûò         $this->memberRepo = Mockery::mock(GroupMemberRepositoryInterface::class);
+     39Γûò         $this->paymentRepo = Mockery::mock(PaymentRepositoryInterface::class);
+  Γ₧£  40Γûò         $this->jitsiService = Mockery::mock(JitsiTokenService::class);
+     41Γûò 
+     42Γûò         $this->service = new SessionService(
+     43Γûò             $this->sessionRepo,
+     44Γûò             $this->memberRepo,
+
+  ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ  
+   FAILED  Tests\Feature\AuthΓÇª   
+  Expected response status code [201] but received 404.
+Failed asserting that 404 is identical to 201.
+
+  at tests\Feature\Auth\AuthTest.php:22
+     18Γûò             'mobile_number' => '+201001234567',
+     19Γûò             'password' => 'SecurePass123!',
+     20Γûò         ]);
+     21Γûò 
+  Γ₧£  22Γûò         $response->assertStatus(201)
+     23Γûò             ->assertJsonPath('data.role', UserRole::Addict->value);
+     24Γûò 
+     25Γûò         $this->assertDatabaseHas('users', ['mobile_number' => '+201001234567']);
+     26Γûò     }
+
+  ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ  
+   FAILED  Tests\FeatuΓÇª  Error   
+  Class "Database\Factories\Modules\User\Models\UserFactory" not found
+
+  at vendor\laravel\framework\src\Illuminate\Database\Eloquent\Factories\Factory.php:1014
+    1010Γûò     public static function factoryForModel(string $modelName)
+    1011Γûò     {
+    1012Γûò         $factory = static::resolveFactoryName($modelName);
+    1013Γûò 
+  Γ₧£ 1014Γûò         return $factory::new();
+    1015Γûò     }
+    1016Γûò 
+    1017Γûò     /**
+    1018Γûò      * Specify the callback that should be invoked to guess factory names based on dynamic relationship names.
+
+  1   vendor\laravel\framework\src\Illuminate\Database\Eloquent\Factories\Factory.php:1014
+  2   vendor\laravel\framework\src\Illuminate\Database\Eloquent\Factories\HasFactory.php:21
+
+  ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ  
+   FAILED  Tests\FeatuΓÇª  Error   
+  Class "Database\Factories\Modules\User\Models\UserFactory" not found
+
+  at vendor\laravel\framework\src\Illuminate\Database\Eloquent\Factories\Factory.php:1014
+    1010Γûò     public static function factoryForModel(string $modelName)
+    1011Γûò     {
+    1012Γûò         $factory = static::resolveFactoryName($modelName);
+    1013Γûò 
+  Γ₧£ 1014Γûò         return $factory::new();
+    1015Γûò     }
+    1016Γûò 
+    1017Γûò     /**
+    1018Γûò      * Specify the callback that should be invoked to guess factory names based on dynamic relationship names.
+
+  1   vendor\laravel\framework\src\Illuminate\Database\Eloquent\Factories\Factory.php:1014
+  2   vendor\laravel\framework\src\Illuminate\Database\Eloquent\Factories\HasFactory.php:21
+
+  ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ  
+   FAILED  Tests\FeatuΓÇª  Error   
+  Class "Database\Factories\Modules\User\Models\UserFactory" not found
+
+  at vendor\laravel\framework\src\Illuminate\Database\Eloquent\Factories\Factory.php:1014
+    1010Γûò     public static function factoryForModel(string $modelName)
+    1011Γûò     {
+    1012Γûò         $factory = static::resolveFactoryName($modelName);
+    1013Γûò 
+  Γ₧£ 1014Γûò         return $factory::new();
+    1015Γûò     }
+    1016Γûò 
+    1017Γûò     /**
+    1018Γûò      * Specify the callback that should be invoked to guess factory names based on dynamic relationship names.
+
+  1   vendor\laravel\framework\src\Illuminate\Database\Eloquent\Factories\Factory.php:1014
+  2   vendor\laravel\framework\src\Illuminate\Database\Eloquent\Factories\HasFactory.php:21
+
+  ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ  
+   FAILED  Tests\FeatuΓÇª  Error   
+  Class "Database\Factories\Modules\User\Models\UserFactory" not found
+
+  at vendor\laravel\framework\src\Illuminate\Database\Eloquent\Factories\Factory.php:1014
+    1010Γûò     public static function factoryForModel(string $modelName)
+    1011Γûò     {
+    1012Γûò         $factory = static::resolveFactoryName($modelName);
+    1013Γûò 
+  Γ₧£ 1014Γûò         return $factory::new();
+    1015Γûò     }
+    1016Γûò 
+    1017Γûò     /**
+    1018Γûò      * Specify the callback that should be invoked to guess factory names based on dynamic relationship names.
+
+  1   vendor\laravel\framework\src\Illuminate\Database\Eloquent\Factories\Factory.php:1014
+  2   vendor\laravel\framework\src\Illuminate\Database\Eloquent\Factories\HasFactory.php:21
+
+
+  Tests:    12 failed, 2 passed (3 assertions)
+  Duration: 1.90s
+

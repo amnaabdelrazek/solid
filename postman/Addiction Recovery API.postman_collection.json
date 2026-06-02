@@ -1,0 +1,2369 @@
+{
+  "info": {
+    "_postman_id": "5d31c710-54d3-46ea-959a-bb0517875d4e-updated",
+    "name": "Addiction Recovery API",
+    "description": "RESTful API for the Addiction Recovery Platform. This collection covers authentication, user management, support groups, therapy sessions, payments, notifications, and recommendations.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "24142261"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "password",
+          "item": [
+            {
+              "name": "forgot-password",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "mobile_number",
+                      "value": "+201001234564",
+                      "type": "text"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{base_url}}/auth/forgot-password",
+                  "host": ["{{base_url}}"],
+                  "path": ["auth", "forgot-password"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "verify-forgot-otp",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "token",
+                      "value": "pSfR9vqEhmo5AzyObD2H260IRvx68CWcm2hiwbDRFrBl0vyQksg941HG0dtrVBZq",
+                      "type": "text"
+                    },
+                    {
+                      "key": "otp",
+                      "value": "1111",
+                      "type": "text"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{base_url}}/auth/verify-forgot-otp",
+                  "host": ["{{base_url}}"],
+                  "path": ["auth", "verify-forgot-otp"]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "reset-password",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "reset_token",
+                      "value": "5jElKMFZCqaMh7SyhhzLSfMJ4hSeWB6M0kqGIZc0NKO32UINxUFsVvNChS3m4Vh6",
+                      "type": "text"
+                    },
+                    {
+                      "key": "password",
+                      "value": "11112222",
+                      "type": "text"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{base_url}}/auth/reset-password",
+                  "host": ["{{base_url}}"],
+                  "path": ["auth", "reset-password"]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Response has valid structure', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('custom_code');",
+                  "    pm.expect(jsonData).to.have.property('status');",
+                  "    pm.expect(jsonData).to.have.property('message');",
+                  "    pm.expect(jsonData).to.have.property('body');",
+                  "});",
+                  "",
+                  "pm.test('User data is present', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.body).to.have.property('user');",
+                  "    pm.expect(jsonData.body.user).to.have.property('id');",
+                  "    pm.expect(jsonData.body.user).to.have.property('display_name');",
+                  "    pm.expect(jsonData.body.user).to.have.property('role');",
+                  "});",
+                  "",
+                  "pm.test('Token is returned', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.body).to.have.property('token');",
+                  "    pm.expect(jsonData.body).to.have.property('token_type');",
+                  "    pm.expect(jsonData.body.token_type).to.eql('Bearer');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "Accept", "value": "application/json", "type": "text"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"display_name\": \"Ahmed Hassan\",\n    \"mobile_number\": \"+201001234566\",\n    \"password\": \"SecurePass123!\",\n    \"preferred_language\": \"ar\",\n    \"addiction_duration_id\": 1,\n    \"education_level_id\": 2,\n    \"had_prior_treatment\": false,\n    \"substance_ids\": [1, 2],\n    \"treatment_type_ids\": [3],\n    \"addiction_reason\": \"Stress and peer pressure\",\n    \"days_clean\": 15\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "register"]
+            },
+            "description": "Register a new user with addiction profile information. Returns authentication token upon successful registration."
+          },
+          "response": [
+            {
+              "name": "Success - User Registered",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {"mode": "raw", "raw": "{\n    \"display_name\": \"Ahmed Hassan\",\n    \"mobile_number\": \"+201001234567\",\n    \"password\": \"SecurePass123!\",\n    \"preferred_language\": \"ar\",\n    \"addiction_duration_id\": 1,\n    \"education_level_id\": 2,\n    \"had_prior_treatment\": false,\n    \"substance_ids\": [1, 2],\n    \"treatment_type_ids\": [3],\n    \"addiction_reason\": \"Stress and peer pressure\",\n    \"days_clean\": 15\n}"}
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 201,\n    \"status\": true,\n    \"message\": \"User registered successfully\",\n    \"body\": {\n        \"user\": {\n            \"id\": 1,\n            \"display_name\": \"Ahmed Hassan\",\n            \"mobile_number\": \"+201001234567\",\n            \"role\": \"addict\",\n            \"preferred_language\": \"ar\",\n            \"is_active\": true\n        },\n        \"token\": \"1|abc123xyz789...\",\n        \"token_type\": \"Bearer\"\n    },\n    \"info\": \"from response action\"\n}"
+            },
+            {
+              "name": "Validation Error - Missing Required Fields",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {"mode": "raw", "raw": "{\n    \"display_name\": \"Ahmed Hassan\"\n}"}
+              },
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"The given data was invalid.\",\n    \"errors\": {\n        \"mobile_number\": [\"The mobile number field is required.\"],\n        \"password\": [\"The password field is required.\"],\n        \"addiction_duration_id\": [\"The addiction duration id field is required.\"],\n        \"education_level_id\": [\"The education level id field is required.\"],\n        \"had_prior_treatment\": [\"The had prior treatment field is required.\"],\n        \"substance_ids\": [\"The substance ids field is required.\"]\n    }\n}"
+            },
+            {
+              "name": "Validation Error - Duplicate Mobile",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {"mode": "raw", "raw": "{\n    \"display_name\": \"Ahmed Hassan\",\n    \"mobile_number\": \"+201001234567\",\n    \"password\": \"SecurePass123!\",\n    \"addiction_duration_id\": 1,\n    \"education_level_id\": 2,\n    \"had_prior_treatment\": false,\n    \"substance_ids\": [1]\n}"}
+              },
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"The given data was invalid.\",\n    \"errors\": {\n        \"mobile_number\": [\"The mobile number has already been taken.\"]\n    }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Verify OTP",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Response has valid structure', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('custom_code');",
+                  "    pm.expect(jsonData).to.have.property('status');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json", "disabled": true}
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {"key": "otp", "value": "1111", "type": "text"}
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/verify",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "verify"]
+            },
+            "description": "Verify user's phone number with OTP code sent during registration."
+          },
+          "response": [
+            {
+              "name": "Success - OTP Verified",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {"mode": "raw", "raw": "{\n    \"mobile_number\": \"+201001234567\",\n    \"otp_code\": \"123456\"\n}"}
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 200,\n    \"status\": true,\n    \"message\": \"OTP verified successfully\",\n    \"body\": {},\n    \"info\": \"from response action\"\n}"
+            },
+            {
+              "name": "Validation Error - Invalid OTP",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {"mode": "raw", "raw": "{\n    \"mobile_number\": \"+201001234567\",\n    \"otp_code\": \"000000\"\n}"}
+              },
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"The given data was invalid.\",\n    \"errors\": {\n        \"otp_code\": [\"The OTP code is invalid or expired.\"]\n    }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Response has valid structure', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('body');",
+                  "    pm.expect(jsonData.body).to.have.property('token');",
+                  "    pm.expect(jsonData.body).to.have.property('user');",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    var token = pm.response.json().body.token;",
+                  "    pm.collectionVariables.set('token', token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "Accept", "value": "application/json", "type": "text"},
+              {"key": "Accept-Language", "value": "ar", "type": "text"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"mobile_number\": \"+201001234563\",\n    \"password\": \"SecurePass123!\",\n    \"device_id\": \"device-uuid-12345\",\n    \"platform\": \"android\",\n    \"app_version\": \"1.0.0\"\n    \n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Authenticate user with mobile number and password. Returns Bearer token for subsequent requests."
+          },
+          "response": [
+            {
+              "name": "Success - Logged In",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {"mode": "raw", "raw": "{\n    \"mobile_number\": \"+201001234567\",\n    \"password\": \"SecurePass123!\",\n    \"device_id\": \"device-uuid-12345\"\n}"}
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 200,\n    \"status\": true,\n    \"message\": \"Login successful\",\n    \"body\": {\n        \"token\": \"2|xyz789abc123...\",\n        \"token_type\": \"Bearer\",\n        \"user\": {\n            \"id\": 1,\n            \"display_name\": \"Ahmed Hassan\",\n            \"mobile_number\": \"+201001234567\",\n            \"role\": \"addict\",\n            \"preferred_language\": \"ar\",\n            \"is_active\": true,\n            \"groups\": []\n        }\n    },\n    \"info\": \"from response action\"\n}"
+            },
+            {
+              "name": "Unauthorized - Invalid Credentials",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {"mode": "raw", "raw": "{\n    \"mobile_number\": \"+201001234567\",\n    \"password\": \"WrongPassword123!\",\n    \"device_id\": \"device-uuid-12345\"\n}"}
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"Invalid credentials\",\n    \"custom_code\": 401\n}"
+            },
+            {
+              "name": "Validation Error - Missing Fields",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {"mode": "raw", "raw": "{\n    \"mobile_number\": \"+201001234567\"\n}"}
+              },
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"The given data was invalid.\",\n    \"errors\": {\n        \"password\": [\"The password field is required.\"],\n        \"device_id\": [\"The device id field is required.\"]\n    }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Response confirms logout', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.eql(true);",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set('token', '');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "Authorization", "value": "Bearer {{token}}"}
+            ],
+            "body": {"mode": "raw", "raw": "{}"},
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "logout"]
+            },
+            "description": "Logout the current user and invalidate the token."
+          },
+          "response": [
+            {
+              "name": "Success - Logged Out",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "POST",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 200,\n    \"status\": true,\n    \"message\": \"Logged out successfully\",\n    \"body\": {},\n    \"info\": \"from response action\"\n}"
+            },
+            {
+              "name": "Unauthorized - No Token",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "POST",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"Unauthenticated.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Current User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Response contains user data', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.body).to.have.property('user');",
+                  "    pm.expect(jsonData.body.user).to.have.property('id');",
+                  "    pm.expect(jsonData.body.user).to.have.property('display_name');",
+                  "    pm.expect(jsonData.body.user).to.have.property('role');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+            "method": "GET",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/me",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "me"]
+            },
+            "description": "Get the currently authenticated user's profile with addiction profile and group information."
+          },
+          "response": [
+            {
+              "name": "Success - User Profile",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "GET",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 200,\n    \"status\": true,\n    \"message\": \"Data retrieved successfully\",\n    \"body\": {\n        \"user\": {\n            \"id\": 1,\n            \"display_name\": \"Ahmed Hassan\",\n            \"mobile_number\": \"+201001234567\",\n            \"username\": null,\n            \"role\": \"addict\",\n            \"preferred_language\": \"ar\",\n            \"is_active\": true,\n            \"email_verified_at\": \"2026-04-04T10:00:00Z\",\n            \"created_at\": \"2026-04-01T08:00:00Z\",\n            \"updated_at\": \"2026-04-04T10:00:00Z\",\n            \"addiction_profile\": {\n                \"id\": 1,\n                \"user_id\": 1,\n                \"had_prior_treatment\": false,\n                \"addiction_reason\": \"Stress and peer pressure\",\n                \"days_clean\": 15\n            },\n            \"groups\": [\n                {\n                    \"id\": 1,\n                    \"name_ar\": \"مجموعة الدعم الأولى\",\n                    \"name_en\": \"First Support Group\",\n                    \"group_type\": \"support\",\n                    \"status\": \"active\"\n                }\n            ]\n        }\n    },\n    \"info\": \"from response action\"\n}"
+            },
+            {
+              "name": "Unauthorized - Invalid Token",
+              "originalRequest": {
+                "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "invalid-token", "type": "string"}]},
+                "method": "GET",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"Unauthenticated.\"\n}"
+            }
+          ]
+        }
+      ],
+      "description": "Authentication endpoints for user registration, login, and session management"
+    },
+    {
+      "name": "Sessions",
+      "item": [
+        {
+          "name": "List Sessions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Response contains sessions array', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.body).to.have.property('sessions');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+            "method": "GET",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}", "disabled": true},
+              {"key": "Accept", "value": "application/json", "type": "text"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/sessions",
+              "host": ["{{base_url}}"],
+              "path": ["sessions"]
+            },
+            "description": "Get upcoming sessions for the user's group. Returns sessions scheduled at or after the current time."
+          },
+          "response": [
+            {
+              "name": "Success - Sessions List",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "GET",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 200,\n    \"status\": true,\n    \"message\": \"Data retrieved successfully\",\n    \"body\": {\n        \"sessions\": [\n            {\n                \"id\": 1,\n                \"group_id\": 1,\n                \"instructor_id\": 2,\n                \"session_type\": \"paid\",\n                \"status\": \"scheduled\",\n                \"scheduled_at\": \"2026-04-06T09:00:00Z\",\n                \"duration_minutes\": 15,\n                \"jitsi_room_name\": \"group-1-session-1\",\n                \"price\": 1200\n            },\n            {\n                \"id\": 2,\n                \"group_id\": 1,\n                \"instructor_id\": 2,\n                \"session_type\": \"paid\",\n                \"status\": \"scheduled\",\n                \"scheduled_at\": \"2026-04-07T09:00:00Z\",\n                \"duration_minutes\": 15,\n                \"jitsi_room_name\": \"group-1-session-2\",\n                \"price\": 1200\n            },\n            {\n                \"id\": 3,\n                \"group_id\": 1,\n                \"instructor_id\": 2,\n                \"session_type\": \"paid\",\n                \"status\": \"scheduled\",\n                \"scheduled_at\": \"2026-04-08T09:00:00Z\",\n                \"duration_minutes\": 15,\n                \"jitsi_room_name\": \"group-1-session-3\",\n                \"price\": 1200\n            },\n            {\n                \"id\": 4,\n                \"group_id\": 1,\n                \"instructor_id\": 2,\n                \"session_type\": \"paid\",\n                \"status\": \"scheduled\",\n                \"scheduled_at\": \"2026-04-09T09:00:00Z\",\n                \"duration_minutes\": 15,\n                \"jitsi_room_name\": \"group-1-session-4\",\n                \"price\": 1200\n            }\n        ]\n    },\n    \"info\": \"from response action\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Create Session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Response has valid structure', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('custom_code');",
+                  "    pm.expect(jsonData).to.have.property('status');",
+                  "    pm.expect(jsonData).to.have.property('message');",
+                  "});",
+                  "",
+                  "pm.test('Session created successfully', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.body).to.have.property('session');",
+                  "    pm.expect(jsonData.body.session).to.have.property('id');",
+                  "    pm.expect(jsonData.body.session).to.have.property('group_id');",
+                  "    pm.expect(jsonData.body.session).to.have.property('session_type');",
+                  "    pm.expect(jsonData.body.session.status).to.eql('scheduled');",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    var session = pm.response.json().body.session;",
+                  "    pm.collectionVariables.set('session_id', session.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"},
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "Accept", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"group_id\": 1,\n    \"session_type\": \"paid\",\n    \"scheduled_at\": \"2026-04-10T18:00:00Z\",\n    \"duration_minutes\": 15\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/sessions",
+              "host": ["{{base_url}}"],
+              "path": ["sessions"]
+            },
+            "description": "Create a new therapy session. Only available to instructors and admins. Valid session_type: 'free' or 'paid'. Duration: 15-180 minutes. scheduled_at must be in the future."
+          },
+          "response": [
+            {
+              "name": "Success - Session Created",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "POST",
+                "header": [],
+                "body": {"mode": "raw", "raw": "{\n    \"group_id\": 1,\n    \"session_type\": \"free\",\n    \"scheduled_at\": \"2026-04-10T18:00:00Z\",\n    \"duration_minutes\": 45\n}"}
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 201,\n    \"status\": true,\n    \"message\": \"Session created successfully.\",\n    \"body\": {\n        \"session\": {\n            \"id\": 3,\n            \"group_id\": 1,\n            \"instructor_id\": 2,\n            \"session_type\": \"paid\",\n            \"status\": \"scheduled\",\n            \"scheduled_at\": \"2026-04-10T09:00:00Z\",\n            \"duration_minutes\": 15,\n            \"jitsi_room_name\": \"group-1-session-3\",\n            \"price\": 1200\n        }\n    },\n    \"info\": \"from response action\"\n}"
+            },
+            {
+              "name": "Validation Error - Missing Required Fields",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "POST",
+                "header": [],
+                "body": {"mode": "raw", "raw": "{\n    \"group_id\": 1\n}"}
+              },
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"The given data was invalid.\",\n    \"errors\": {\n        \"session_type\": [\"The session type field is required.\"],\n        \"scheduled_at\": [\"The scheduled at field is required.\"],\n        \"duration_minutes\": [\"The duration minutes field is required.\"]\n    }\n}"
+            },
+            {
+              "name": "Validation Error - Invalid Session Type",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "POST",
+                "header": [],
+                "body": {"mode": "raw", "raw": "{\n    \"group_id\": 1,\n    \"session_type\": \"invalid_type\",\n    \"scheduled_at\": \"2026-04-10T09:00:00Z\",\n    \"duration_minutes\": 15\n}"}
+              },
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"The given data was invalid.\",\n    \"errors\": {\n        \"session_type\": [\"The selected session type is invalid.\"]\n    }\n}"
+            },
+            {
+              "name": "Forbidden - Not Instructor or Admin",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "POST",
+                "header": [],
+                "body": {"mode": "raw", "raw": "{\n    \"group_id\": 1,\n    \"session_type\": \"paid\",\n    \"scheduled_at\": \"2026-04-10T09:00:00Z\",\n    \"duration_minutes\": 15\n}"}
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"This action is unauthorized.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Response contains session with relationships', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.body).to.have.property('session');",
+                  "    pm.expect(jsonData.body.session).to.have.property('instructor');",
+                  "    pm.expect(jsonData.body.session).to.have.property('group');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+            "method": "GET",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/sessions/{{session_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["sessions", "{{session_id}}"]
+            },
+            "description": "Get details of a specific session including instructor and group information."
+          },
+          "response": [
+            {
+              "name": "Success - Session Details",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "GET",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 200,\n    \"status\": true,\n    \"message\": \"Data retrieved successfully\",\n    \"body\": {\n        \"session\": {\n            \"id\": 1,\n            \"group_id\": 1,\n            \"instructor_id\": 2,\n            \"session_type\": \"paid\",\n            \"status\": \"scheduled\",\n            \"scheduled_at\": \"2026-04-06T09:00:00Z\",\n            \"started_at\": null,\n            \"ended_at\": null,\n            \"duration_minutes\": 15,\n            \"jitsi_room_name\": \"group-1-session-1\",\n            \"price\": 1200,\n            \"instructor\": {\n                \"id\": 2,\n                \"display_name\": \"Dr. Sara Mohamed\",\n                \"role\": \"instructor\"\n            },\n            \"group\": {\n                \"id\": 1,\n                \"name_ar\": \"مجموعة الدعم الأولى\",\n                \"name_en\": \"First Support Group\"\n            }\n        }\n    },\n    \"info\": \"from response action\"\n}"
+            },
+            {
+              "name": "Not Found - Session Does Not Exist",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "GET",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"No query results for model [Session].\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Join Session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Response confirms join', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.body).to.have.property('attendance');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/sessions/{{session_id}}/join",
+              "host": ["{{base_url}}"],
+              "path": ["sessions", "{{session_id}}", "join"]
+            },
+            "description": "Join an active therapy session. Records attendance with join timestamp."
+          },
+          "response": [
+            {
+              "name": "Success - Joined Session",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "POST",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 200,\n    \"status\": true,\n    \"message\": \"Joined session successfully\",\n    \"body\": {\n        \"attendance\": {\n            \"id\": 5,\n            \"session_id\": 1,\n            \"user_id\": 1,\n            \"joined_at\": \"2026-04-05T18:05:00Z\",\n            \"left_at\": null,\n            \"was_present\": true\n        }\n    },\n    \"info\": \"from response action\"\n}"
+            },
+            {
+              "name": "Error - Session Not Active",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "POST",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"Cannot join session that has not started or has already ended.\"\n}"
+            },
+            {
+              "name": "Error - Already Joined",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "POST",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "Conflict",
+              "code": 409,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"You have already joined this session.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Leave Session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Response confirms leave', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.eql(true);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/sessions/{{session_id}}/leave",
+              "host": ["{{base_url}}"],
+              "path": ["sessions", "{{session_id}}", "leave"]
+            },
+            "description": "Leave an active therapy session. Records leave timestamp in attendance."
+          },
+          "response": [
+            {
+              "name": "Success - Left Session",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "POST",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 200,\n    \"status\": true,\n    \"message\": \"Left session successfully.\",\n    \"body\": {},\n    \"info\": \"from response action\"\n}"
+            },
+            {
+              "name": "Error - Not In Session",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "POST",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"You are not currently in this session.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Start Session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Response confirms start', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.eql(true);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/sessions/{{session_id}}/start",
+              "host": ["{{base_url}}"],
+              "path": ["sessions", "{{session_id}}", "start"]
+            },
+            "description": "Start a scheduled session. Only available to instructors and admins. Changes session status to 'live'."
+          },
+          "response": [
+            {
+              "name": "Success - Session Started",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "POST",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 200,\n    \"status\": true,\n    \"message\": \"Session started.\",\n    \"body\": {},\n    \"info\": \"from response action\"\n}"
+            },
+            {
+              "name": "Forbidden - Not Instructor",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "POST",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"This action is unauthorized.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "End Session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Response confirms end', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.eql(true);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/sessions/{{session_id}}/end",
+              "host": ["{{base_url}}"],
+              "path": ["sessions", "{{session_id}}", "end"]
+            },
+            "description": "End an active session. Only available to instructors and admins. Changes session status to 'finished'."
+          },
+          "response": [
+            {
+              "name": "Success - Session Ended",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "POST",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 200,\n    \"status\": true,\n    \"message\": \"Session ended.\",\n    \"body\": {},\n    \"info\": \"from response action\"\n}"
+            },
+            {
+              "name": "Error - Session Not Started",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "POST",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"Cannot end a session that has not started.\"\n}"
+            }
+          ]
+        }
+      ],
+      "description": "Therapy session management - view, create, join, leave, start, and end therapy sessions"
+    },
+    {
+      "name": "Groups",
+      "item": [
+        {
+          "name": "Get My Group",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Response contains group data', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.body).to.have.property('group');",
+                  "    pm.expect(jsonData.body.group).to.have.property('instructor');",
+                  "    pm.expect(jsonData.body.group).to.have.property('members');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+            "method": "GET",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/groups/my",
+              "host": ["{{base_url}}"],
+              "path": ["groups", "my"]
+            },
+            "description": "Get the user's assigned support group with instructor and member details."
+          },
+          "response": [
+            {
+              "name": "Success - My Group",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "GET",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 200,\n    \"status\": true,\n    \"message\": \"Data retrieved successfully\",\n    \"body\": {\n        \"group\": {\n            \"id\": 1,\n            \"group_type\": \"single_category\",\n            \"status\": \"active\",\n            \"name_ar\": \"مجموعة الدعم الأولى\",\n            \"name_en\": \"First Support Group\",\n            \"min_members\": 10,\n            \"max_members\": 15,\n            \"instructor\": {\n                \"id\": 2,\n                \"display_name\": \"Dr. Sara Mohamed\",\n                \"role\": \"instructor\"\n            },\n            \"members\": [\n                {\n                    \"id\": 1,\n                    \"display_name\": \"Ahmed Hassan\",\n                    \"role\": \"addict\"\n                },\n                {\n                    \"id\": 3,\n                    \"display_name\": \"Omar Ali\",\n                    \"role\": \"addict\"\n                }\n            ]\n        }\n    },\n    \"info\": \"from response action\"\n}"
+            },
+            {
+              "name": "Not Found - No Group Assigned",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "GET",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"No group found for this user.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "List",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Response contains groups array', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.body).to.have.property('groups');",
+                  "    var groups = jsonData.body.groups;",
+                  "    pm.expect(Array.isArray(groups)).to.eql(true);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+            "method": "GET",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/groups",
+              "host": ["{{base_url}}"],
+              "path": ["groups"]
+            },
+            "description": "Get list of all available support groups. Returns all active groups in the system."
+          },
+          "response": [
+            {
+              "name": "Success - Groups List",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "GET",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 200,\n    \"status\": true,\n    \"message\": \"Data retrieved successfully\",\n    \"body\": {\n        \"groups\": [\n            {\n                \"id\": 1,\n                \"group_type\": \"single_category\",\n                \"status\": \"active\",\n                \"name_ar\": \"مجموعة الدعم الأولى\",\n                \"name_en\": \"First Support Group\",\n                \"min_members\": 10,\n                \"max_members\": 15\n            },\n            {\n                \"id\": 2,\n                \"group_type\": \"mixed\",\n                \"status\": \"forming\",\n                \"name_ar\": \"مجموعة الدعم الثانية\",\n                \"name_en\": \"Second Support Group\",\n                \"min_members\": 8,\n                \"max_members\": 12\n            }\n        ]\n    },\n    \"info\": \"from response action\"\n}"
+            }
+          ]
+        }
+      ],
+      "description": "Support group management - view user's assigned group and list all groups"
+    },
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "Initiate Payment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Response contains payment data', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.body).to.have.property('payment');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/payments/initiate/{{session_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["payments", "initiate", "{{session_id}}"]
+            },
+            "description": "Initiate payment for a paid session. Creates a pending payment record and returns gateway-specific payment data."
+          },
+          "response": [
+            {
+              "name": "Success - Payment Initiated",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "POST",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 200,\n    \"status\": true,\n    \"message\": \"Data retrieved successfully\",\n    \"body\": {\n        \"payment\": {\n            \"id\": 1,\n            \"user_id\": 1,\n            \"session_id\": 1,\n            \"amount\": 150.00,\n            \"currency\": \"EGP\",\n            \"status\": \"pending\",\n            \"gateway\": \"paymob\",\n            \"gateway_transaction_id\": \"TXN123456\",\n            \"paid_at\": null\n        }\n    },\n    \"info\": \"from response action\"\n}"
+            },
+            {
+              "name": "Error - Session Not Billable",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "POST",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"This session does not require payment.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Payment History",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Response contains payments array', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.body).to.have.property('data');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+            "method": "GET",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/payments/history",
+              "host": ["{{base_url}}"],
+              "path": ["payments", "history"]
+            },
+            "description": "Get paginated payment history for the authenticated user."
+          },
+          "response": [
+            {
+              "name": "Success - Payment History",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "GET",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 200,\n    \"status\": true,\n    \"message\": \"Data retrieved successfully\",\n    \"body\": {\n        \"data\": [\n            {\n                \"id\": 2,\n                \"user_id\": 1,\n                \"session_id\": 2,\n                \"amount\": 200.00,\n                \"currency\": \"EGP\",\n                \"status\": \"completed\",\n                \"gateway\": \"fawry\",\n                \"paid_at\": \"2026-04-03T14:30:00Z\",\n                \"session\": {\n                    \"id\": 2,\n                    \"session_type\": \"paid\",\n                    \"scheduled_at\": \"2026-04-02T19:00:00Z\"\n                }\n            },\n            {\n                \"id\": 1,\n                \"user_id\": 1,\n                \"session_id\": 1,\n                \"amount\": 150.00,\n                \"currency\": \"EGP\",\n                \"status\": \"completed\",\n                \"gateway\": \"paymob\",\n                \"paid_at\": \"2026-04-01T10:00:00Z\",\n                \"session\": {\n                    \"id\": 1,\n                    \"session_type\": \"free\",\n                    \"scheduled_at\": \"2026-03-29T18:00:00Z\"\n                }\n            }\n        ],\n        \"links\": {},\n        \"meta\": {\n            \"current_page\": 1,\n            \"per_page\": 20,\n            \"total\": 2\n        }\n    },\n    \"info\": \"from response action\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Payment Webhook",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Webhook acknowledged', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.message).to.eql('accepted');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "X-Signature", "value": "hmac-signature-here"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"type\": \"transaction_success\",\n    \"data\": {\n        \"id\": \"TXN123456\",\n        \"amount\": 15000,\n        \"currency\": \"EGP\",\n        \"success\": true\n    },\n    \"hmac\": \"calculated-hmac-signature\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/payments/webhook/paymob",
+              "host": ["{{base_url}}"],
+              "path": ["payments", "webhook", "paymob"]
+            },
+            "description": "Receive payment gateway webhook notifications. Supports Paymob and Fawry gateways. Validates HMAC signature before processing."
+          },
+          "response": [
+            {
+              "name": "Success - Webhook Accepted",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {"mode": "raw", "raw": "{\n    \"type\": \"transaction_success\",\n    \"data\": {\n        \"id\": \"TXN123456\",\n        \"amount\": 15000,\n        \"currency\": \"EGP\",\n        \"success\": true\n    },\n    \"hmac\": \"calculated-hmac-signature\"\n}"}
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 200,\n    \"status\": true,\n    \"message\": \"accepted\",\n    \"body\": {},\n    \"info\": \"from response action\"\n}"
+            },
+            {
+              "name": "Forbidden - Invalid Signature",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {"mode": "raw", "raw": "{\n    \"type\": \"transaction_success\",\n    \"data\": {\n        \"id\": \"TXN123456\",\n        \"amount\": 15000\n    },\n    \"hmac\": \"invalid-signature\"\n}"}
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"Invalid webhook signature.\"\n}"
+            }
+          ]
+        }
+      ],
+      "description": "Payment management - initiate payments, view history, and handle webhooks"
+    },
+    {
+      "name": "Lookups",
+      "item": [
+        {
+          "name": "Get Substances",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Response contains categories with substances', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.body).to.have.property('categories');",
+                  "    var categories = jsonData.body.categories;",
+                  "    pm.expect(Array.isArray(categories)).to.eql(true);",
+                  "    if (categories.length > 0) {",
+                  "        pm.expect(categories[0]).to.have.property('substances');",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "Accept", "value": "application/json"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/lookups/substances",
+              "host": ["{{base_url}}"],
+              "path": ["lookups", "substances"]
+            },
+            "description": "Get all active substance categories with their associated substances. Used during registration for addiction profile."
+          },
+          "response": [
+            {
+              "name": "Success - Substances List",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 200,\n    \"status\": true,\n    \"message\": \"Data retrieved successfully\",\n    \"body\": {\n        \"categories\": [\n            {\n                \"id\": 1,\n                \"name_ar\": \"الكحول\",\n                \"name_en\": \"Alcohol\",\n                \"slug\": \"alcohol\",\n                \"is_active\": true,\n                \"sort_order\": 1,\n                \"substances\": [\n                    {\n                        \"id\": 1,\n                        \"name_ar\": \"بيرة\",\n                        \"name_en\": \"Beer\",\n                        \"is_active\": true\n                    },\n                    {\n                        \"id\": 2,\n                        \"name_ar\": \"نبيذ\",\n                        \"name_en\": \"Wine\",\n                        \"is_active\": true\n                    }\n                ]\n            },\n            {\n                \"id\": 2,\n                \"name_ar\": \"المواد الأفيونية\",\n                \"name_en\": \"Opioids\",\n                \"slug\": \"opioids\",\n                \"is_active\": true,\n                \"sort_order\": 2,\n                \"substances\": [\n                    {\n                        \"id\": 3,\n                        \"name_ar\": \"هيروين\",\n                        \"name_en\": \"Heroin\",\n                        \"is_active\": true\n                    }\n                ]\n            }\n        ]\n    },\n    \"info\": \"from response action\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Lookup Values",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Response contains lookup values', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.body).to.have.property('values');",
+                  "    var values = jsonData.body.values;",
+                  "    pm.expect(Array.isArray(values)).to.eql(true);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "Accept-Language", "value": "ar", "type": "text"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/lookups/{{lookup_type}}",
+              "host": ["{{base_url}}"],
+              "path": ["lookups", "{{lookup_type}}"]
+            },
+            "description": "Get lookup values by type. Common types: addiction_duration, education_level, treatment_type."
+          },
+          "response": [
+            {
+              "name": "Success - Lookup Values",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 200,\n    \"status\": true,\n    \"message\": \"Data retrieved successfully\",\n    \"body\": {\n        \"values\": [\n            {\n                \"id\": 1,\n                \"lookup_type_id\": 1,\n                \"value_key\": \"less_than_1_year\",\n                \"label_ar\": \"أقل من سنة\",\n                \"label_en\": \"Less than 1 year\",\n                \"sort_order\": 1,\n                \"is_active\": true\n            },\n            {\n                \"id\": 2,\n                \"lookup_type_id\": 1,\n                \"value_key\": \"1_to_5_years\",\n                \"label_ar\": \"من 1 إلى 5 سنوات\",\n                \"label_en\": \"1 to 5 years\",\n                \"sort_order\": 2,\n                \"is_active\": true\n            },\n            {\n                \"id\": 3,\n                \"lookup_type_id\": 1,\n                \"value_key\": \"more_than_5_years\",\n                \"label_ar\": \"أكثر من 5 سنوات\",\n                \"label_en\": \"More than 5 years\",\n                \"sort_order\": 3,\n                \"is_active\": true\n            }\n        ]\n    },\n    \"info\": \"from response action\"\n}"
+            },
+            {
+              "name": "Not Found - Invalid Lookup Type",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"No query results for model [LookupType].\"\n}"
+            }
+          ]
+        }
+      ],
+      "description": "Lookup data - retrieve reference data like substances, education levels, and treatment types"
+    },
+    {
+      "name": "Recommendations",
+      "item": [
+        {
+          "name": "Get Recommendations",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Response contains recommendations array', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.body).to.have.property('recommendations');",
+                  "    var recommendations = jsonData.body.recommendations;",
+                  "    pm.expect(Array.isArray(recommendations)).to.eql(true);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+            "method": "GET",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/recommendations?after_session={{session_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["recommendations"],
+              "query": [
+                {"key": "after_session", "value": "{{session_id}}"}
+              ]
+            },
+            "description": "Get personalized recommendations. Without query param, returns general recommendations. With after_session, returns session-specific recommendations."
+          },
+          "response": [
+            {
+              "name": "Success - General Recommendations",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "GET",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 200,\n    \"status\": true,\n    \"message\": \"Data retrieved successfully\",\n    \"body\": {\n        \"recommendations\": [\n            {\n                \"id\": 1,\n                \"substance_category_id\": null,\n                \"type\": \"support_group\",\n                \"name_ar\": \"مجموعة دعم أصدقاء\",\n                \"name_en\": \"Friends Support Group\",\n                \"contact_info\": \"support@example.com\",\n                \"latitude\": 30.0444,\n                \"longitude\": 31.2357,\n                \"is_active\": true\n            },\n            {\n                \"id\": 2,\n                \"substance_category_id\": 1,\n                \"type\": \"treatment_center\",\n                \"name_ar\": \"مركز علاج الإدمان\",\n                \"name_en\": \"Addiction Treatment Center\",\n                \"contact_info\": \"+201234567890\",\n                \"latitude\": 30.0131,\n                \"longitude\": 31.2089,\n                \"is_active\": true\n            }\n        ]\n    },\n    \"info\": \"from response action\"\n}"
+            },
+            {
+              "name": "Success - Session-Specific Recommendations",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "GET",
+                "header": [],
+                "url": {"raw": "{{base_url}}/recommendations?after_session=1", "host": ["{{base_url}}"], "path": ["recommendations"], "query": [{"key": "after_session", "value": "1"}]}
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 200,\n    \"status\": true,\n    \"message\": \"Data retrieved successfully\",\n    \"body\": {\n        \"recommendations\": [\n            {\n                \"id\": 3,\n                \"substance_category_id\": null,\n                \"type\": \"follow_up\",\n                \"name_ar\": \"جلسة متابعة\",\n                \"name_en\": \"Follow-up Session\",\n                \"contact_info\": \"clinic@example.com\",\n                \"is_active\": true\n            }\n        ]\n    },\n    \"info\": \"from response action\"\n}"
+            }
+          ]
+        }
+      ],
+      "description": "Get personalized recommendations for treatment centers, support groups, or other resources"
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "List Notifications",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Response contains notifications array', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.body).to.have.property('data');",
+                  "});",
+                  "",
+                  "pm.test('Response has valid pagination', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.body).to.have.property('meta');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+            "method": "GET",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"},
+              {"key": "Accept", "value": "application/json"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/notifications",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "notifications"]
+            },
+            "description": "Get paginated list of notifications for the authenticated user."
+          },
+          "response": [
+            {
+              "name": "Success - Notifications List",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "GET",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 200,\n    \"status\": true,\n    \"message\": \"Data retrieved successfully\",\n    \"body\": {\n        \"data\": [\n            {\n                \"id\": 1,\n                \"type\": \"session_reminder\",\n                \"title\": \"Session Starting Soon\",\n                \"body\": \"Your therapy session starts in 30 minutes\",\n                \"data\": {\n                    \"session_id\": 1\n                },\n                \"read_at\": null,\n                \"created_at\": \"2026-04-05T17:30:00Z\"\n            },\n            {\n                \"id\": 2,\n                \"type\": \"payment_received\",\n                \"title\": \"Payment Confirmed\",\n                \"body\": \"Your payment for session #2 has been confirmed\",\n                \"data\": {\n                    \"session_id\": 2\n                },\n                \"read_at\": \"2026-04-03T14:35:00Z\",\n                \"created_at\": \"2026-04-03T14:30:00Z\"\n            }\n        ],\n        \"meta\": {\n            \"current_page\": 1,\n            \"per_page\": 20,\n            \"total\": 2\n        }\n    },\n    \"info\": \"from response action\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Create Notification",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Response has valid structure', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('custom_code');",
+                  "    pm.expect(jsonData).to.have.property('status');",
+                  "});",
+                  "",
+                  "pm.test('Notification created successfully', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.body).to.have.property('notification');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"},
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "Accept", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"type\": \"custom\",\n    \"title\": \"Test Notification\",\n    \"body\": \"This is a test notification\",\n    \"data\": {\n        \"session_id\": 1\n    }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/notifications",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "notifications"]
+            },
+            "description": "Create a new notification for the authenticated user. Valid types: session_reminder, payment_received, custom."
+          },
+          "response": [
+            {
+              "name": "Success - Notification Created",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "POST",
+                "header": [],
+                "body": {"mode": "raw", "raw": "{\n    \"type\": \"custom\",\n    \"title\": \"Test Notification\",\n    \"body\": \"This is a test notification\",\n    \"data\": {\n        \"session_id\": 1\n    }\n}"}
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 201,\n    \"status\": true,\n    \"message\": \"Notification created successfully\",\n    \"body\": {\n        \"notification\": {\n            \"id\": 3,\n            \"type\": \"custom\",\n            \"title\": \"Test Notification\",\n            \"body\": \"This is a test notification\",\n            \"data\": {\n                \"session_id\": 1\n            },\n            \"read_at\": null,\n            \"created_at\": \"2026-04-05T18:00:00Z\"\n        }\n    },\n    \"info\": \"from response action\"\n}"
+            },
+            {
+              "name": "Validation Error - Missing Required Fields",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "POST",
+                "header": [],
+                "body": {"mode": "raw", "raw": "{\n    \"title\": \"Test Notification\"\n}"}
+              },
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"The given data was invalid.\",\n    \"errors\": {\n        \"type\": [\"The type field is required.\"],\n        \"body\": [\"The body field is required.\"]\n    }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Notification",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Response contains notification data', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.body).to.have.property('notification');",
+                  "    pm.expect(jsonData.body.notification).to.have.property('id');",
+                  "    pm.expect(jsonData.body.notification).to.have.property('type');",
+                  "    pm.expect(jsonData.body.notification).to.have.property('title');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+            "method": "GET",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/notifications/{{notification_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "notifications", "{{notification_id}}"]
+            },
+            "description": "Get details of a specific notification."
+          },
+          "response": [
+            {
+              "name": "Success - Notification Details",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "GET",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 200,\n    \"status\": true,\n    \"message\": \"Data retrieved successfully\",\n    \"body\": {\n        \"notification\": {\n            \"id\": 1,\n            \"type\": \"session_reminder\",\n            \"title\": \"Session Starting Soon\",\n            \"body\": \"Your therapy session starts in 30 minutes\",\n            \"data\": {\n                \"session_id\": 1\n            },\n            \"read_at\": null,\n            \"created_at\": \"2026-04-05T17:30:00Z\"\n        }\n    },\n    \"info\": \"from response action\"\n}"
+            },
+            {
+              "name": "Not Found - Notification Does Not Exist",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "GET",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"No query results for model [Notification].\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Notification",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Response confirms update', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.eql(true);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+            "method": "PUT",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"type\": \"custom\",\n    \"title\": \"Updated Title\",\n    \"body\": \"Updated notification body\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/notifications/{{notification_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "notifications", "{{notification_id}}"]
+            },
+            "description": "Update an existing notification. Can mark as read by setting read_at timestamp."
+          },
+          "response": [
+            {
+              "name": "Success - Notification Updated",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "PUT",
+                "header": [],
+                "body": {"mode": "raw", "raw": "{\n    \"type\": \"custom\",\n    \"title\": \"Updated Title\",\n    \"body\": \"Updated notification body\"\n}"}
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 200,\n    \"status\": true,\n    \"message\": \"Notification updated successfully\",\n    \"body\": {},\n    \"info\": \"from response action\"\n}"
+            },
+            {
+              "name": "Success - Mark as Read",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "PUT",
+                "header": [],
+                "body": {"mode": "raw", "raw": "{\n    \"read_at\": \"2026-04-05T18:00:00Z\"\n}"}
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 200,\n    \"status\": true,\n    \"message\": \"Notification marked as read\",\n    \"body\": {},\n    \"info\": \"from response action\"\n}"
+            },
+            {
+              "name": "Not Found - Notification Does Not Exist",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "PUT",
+                "header": [],
+                "body": {"mode": "raw", "raw": "{\n    \"title\": \"Updated Title\"\n}"}
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"No query results for model [Notification].\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Delete Notification",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Response confirms deletion', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.eql(true);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+            "method": "DELETE",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/notifications/{{notification_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "notifications", "{{notification_id}}"]
+            },
+            "description": "Delete a notification."
+          },
+          "response": [
+            {
+              "name": "Success - Notification Deleted",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "DELETE",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 200,\n    \"status\": true,\n    \"message\": \"Notification deleted successfully\",\n    \"body\": {},\n    \"info\": \"from response action\"\n}"
+            },
+            {
+              "name": "Not Found - Notification Does Not Exist",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "DELETE",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"No query results for model [Notification].\"\n}"
+            }
+          ]
+        }
+      ],
+      "description": "Notification management - create, read, update, and delete notifications"
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "List Users",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Response contains users array', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.body).to.have.property('data');",
+                  "});",
+                  "",
+                  "pm.test('Response has valid pagination', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.body).to.have.property('meta');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+            "method": "GET",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"},
+              {"key": "Accept", "value": "application/json"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/users",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "users"]
+            },
+            "description": "Get paginated list of users. Only available to admins."
+          },
+          "response": [
+            {
+              "name": "Success - Users List",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "GET",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 200,\n    \"status\": true,\n    \"message\": \"Data retrieved successfully\",\n    \"body\": {\n        \"data\": [\n            {\n                \"id\": 1,\n                \"display_name\": \"Ahmed Hassan\",\n                \"mobile_number\": \"+201001234567\",\n                \"role\": \"addict\",\n                \"preferred_language\": \"ar\",\n                \"is_active\": true,\n                \"created_at\": \"2026-04-01T08:00:00Z\"\n            },\n            {\n                \"id\": 2,\n                \"display_name\": \"Dr. Sara Mohamed\",\n                \"mobile_number\": \"+201001234568\",\n                \"role\": \"instructor\",\n                \"preferred_language\": \"ar\",\n                \"is_active\": true,\n                \"created_at\": \"2026-03-15T10:00:00Z\"\n            }\n        ],\n        \"meta\": {\n            \"current_page\": 1,\n            \"per_page\": 20,\n            \"total\": 2\n        }\n    },\n    \"info\": \"from response action\"\n}"
+            },
+            {
+              "name": "Forbidden - Not Admin",
+              "originalRequest": {
+                "auth": {"type": "bearer"}},
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"This action is unauthorized.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Create User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('User created successfully', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.body).to.have.property('user');",
+                  "    pm.expect(jsonData.body.user).to.have.property('id');",
+                  "    pm.expect(jsonData.body.user).to.have.property('display_name');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"},
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "Accept", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"display_name\": \"New User\",\n    \"mobile_number\": \"+201001234570\",\n    \"password\": \"SecurePass123!\",\n    \"role\": \"addict\",\n    \"preferred_language\": \"ar\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/users",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "users"]
+            },
+            "description": "Create a new user. Only available to admins. Valid roles: addict, instructor, admin."
+          },
+          "response": [
+            {
+              "name": "Success - User Created",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "POST",
+                "header": [],
+                "body": {"mode": "raw", "raw": "{\n    \"display_name\": \"New User\",\n    \"mobile_number\": \"+201001234570\",\n    \"password\": \"SecurePass123!\",\n    \"role\": \"addict\",\n    \"preferred_language\": \"ar\"\n}"}
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 201,\n    \"status\": true,\n    \"message\": \"User created successfully\",\n    \"body\": {\n        \"user\": {\n            \"id\": 5,\n            \"display_name\": \"New User\",\n            \"mobile_number\": \"+201001234570\",\n            \"role\": \"addict\",\n            \"preferred_language\": \"ar\",\n            \"is_active\": true,\n            \"created_at\": \"2026-04-05T18:00:00Z\"\n        }\n    },\n    \"info\": \"from response action\"\n}"
+            },
+            {
+              "name": "Validation Error - Missing Required Fields",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "POST",
+                "header": [],
+                "body": {"mode": "raw", "raw": "{\n    \"display_name\": \"New User\"\n}"}
+              },
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"The given data was invalid.\",\n    \"errors\": {\n        \"mobile_number\": [\"The mobile number field is required.\"],\n        \"password\": [\"The password field is required.\"],\n        \"role\": [\"The role field is required.\"]\n    }\n}"
+            },
+            {
+              "name": "Validation Error - Duplicate Mobile",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "POST",
+                "header": [],
+                "body": {"mode": "raw", "raw": "{\n    \"display_name\": \"Existing User\",\n    \"mobile_number\": \"+201001234567\",\n    \"password\": \"SecurePass123!\",\n    \"role\": \"addict\"\n}"}
+              },
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"The given data was invalid.\",\n    \"errors\": {\n        \"mobile_number\": [\"The mobile number has already been taken.\"]\n    }\n}"
+            },
+            {
+              "name": "Forbidden - Not Admin",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "POST",
+                "header": []
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"This action is unauthorized.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Response contains user data', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.body).to.have.property('user');",
+                  "    pm.expect(jsonData.body.user).to.have.property('id');",
+                  "    pm.expect(jsonData.body.user).to.have.property('display_name');",
+                  "    pm.expect(jsonData.body.user).to.have.property('role');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+            "method": "GET",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/users/{{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "users", "{{user_id}}"]
+            },
+            "description": "Get details of a specific user."
+          },
+          "response": [
+            {
+              "name": "Success - User Details",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "GET",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 200,\n    \"status\": true,\n    \"message\": \"Data retrieved successfully\",\n    \"body\": {\n        \"user\": {\n            \"id\": 1,\n            \"display_name\": \"Ahmed Hassan\",\n            \"mobile_number\": \"+201001234567\",\n            \"role\": \"addict\",\n            \"preferred_language\": \"ar\",\n            \"is_active\": true,\n            \"created_at\": \"2026-04-01T08:00:00Z\",\n            \"updated_at\": \"2026-04-05T10:00:00Z\"\n        }\n    },\n    \"info\": \"from response action\"\n}"
+            },
+            {
+              "name": "Not Found - User Does Not Exist",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "GET",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"No query results for model [User].\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Response confirms update', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.eql(true);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+            "method": "PUT",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"display_name\": \"Updated Name\",\n    \"preferred_language\": \"en\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/users/{{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "users", "{{user_id}}"]
+            },
+            "description": "Update an existing user's information."
+          },
+          "response": [
+            {
+              "name": "Success - User Updated",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "PUT",
+                "header": [],
+                "body": {"mode": "raw", "raw": "{\n    \"display_name\": \"Updated Name\",\n    \"preferred_language\": \"en\"\n}"}
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 200,\n    \"status\": true,\n    \"message\": \"User updated successfully\",\n    \"body\": {},\n    \"info\": \"from response action\"\n}"
+            },
+            {
+              "name": "Validation Error - Invalid Role",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "PUT",
+                "header": [],
+                "body": {"mode": "raw", "raw": "{\n    \"role\": \"invalid_role\"\n}"}
+              },
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"The given data was invalid.\",\n    \"errors\": {\n        \"role\": [\"The selected role is invalid.\"]\n    }\n}"
+            },
+            {
+              "name": "Not Found - User Does Not Exist",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "PUT",
+                "header": []
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"No query results for model [User].\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Delete User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Response confirms deletion', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.eql(true);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+            "method": "DELETE",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/users/{{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "users", "{{user_id}}"]
+            },
+            "description": "Delete a user (soft delete). Only available to admins."
+          },
+          "response": [
+            {
+              "name": "Success - User Deleted",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "DELETE",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 200,\n    \"status\": true,\n    \"message\": \"User deleted successfully\",\n    \"body\": {},\n    \"info\": \"from response action\"\n}"
+            },
+            {
+              "name": "Not Found - User Does Not Exist",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "DELETE",
+                "header": []
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"No query results for model [User].\"\n}"
+            },
+            {
+              "name": "Forbidden - Not Admin",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "DELETE",
+                "header": []
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"This action is unauthorized.\"\n}"
+            }
+          ]
+        }
+      ],
+      "description": "User management - create, read, update, and delete users (admin only)"
+    },
+    {
+      "name": "Settings",
+      "item": [
+        {
+          "name": "List Settings",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Response contains settings object', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.body).to.have.property('settings');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+            "method": "GET",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"},
+              {"key": "Accept", "value": "application/json"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/settings",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "settings"]
+            },
+            "description": "Get all system settings. Settings control session price, group sizes, session schedule, booking cutoff, and auto-start timeout."
+          },
+          "response": [
+            {
+              "name": "Success - Settings List",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "GET",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 200,\n    \"status\": true,\n    \"message\": \"Data retrieved successfully\",\n    \"body\": {\n        \"settings\": {\n            \"session_price\": {\n                \"value\": 1200,\n                \"type\": \"int\"\n            },\n            \"group_min_members\": {\n                \"value\": 7,\n                \"type\": \"int\"\n            },\n            \"group_max_members\": {\n                \"value\": 15,\n                \"type\": \"int\"\n            },\n            \"session_duration_minutes\": {\n                \"value\": 15,\n                \"type\": \"int\"\n            },\n            \"booking_cutoff_minutes\": {\n                \"value\": 15,\n                \"type\": \"int\"\n            },\n            \"session_start_hour\": {\n                \"value\": 9,\n                \"type\": \"int\"\n            },\n            \"session_days\": {\n                \"value\": [\"sunday\", \"monday\", \"tuesday\", \"wednesday\"],\n                \"type\": \"array\"\n            },\n            \"auto_start_timeout_minutes\": {\n                \"value\": 1440,\n                \"type\": \"int\"\n            }\n        }\n    },\n    \"info\": \"from response action\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Setting",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Response contains setting data', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.body).to.have.property('setting');",
+                  "    pm.expect(jsonData.body.setting).to.have.property('key');",
+                  "    pm.expect(jsonData.body.setting).to.have.property('value');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+            "method": "GET",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"}
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/settings/{{setting_key}}",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "settings", "{{setting_key}}"]
+            },
+            "description": "Get a specific setting by key. Valid keys: session_price, group_min_members, group_max_members, session_duration_minutes, booking_cutoff_minutes, session_start_hour, session_days, auto_start_timeout_minutes."
+          },
+          "response": [
+            {
+              "name": "Success - Setting Details",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "GET",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 200,\n    \"status\": true,\n    \"message\": \"Data retrieved successfully\",\n    \"body\": {\n        \"setting\": {\n            \"key\": \"session_price\",\n            \"value\": 1200,\n            \"type\": \"int\"\n        }\n    },\n    \"info\": \"from response action\"\n}"
+            },
+            {
+              "name": "Not Found - Setting Does Not Exist",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "GET",
+                "header": [],
+                "url": {"raw": ""}
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"No query results for model [Setting].\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Setting",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Response confirms update', function() {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.eql(true);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+            "method": "PUT",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"value\": \"1500\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/settings/{{setting_key}}",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "settings", "{{setting_key}}"]
+            },
+            "description": "Update a setting value. The value must be a valid JSON string. For numbers use \"1500\", for arrays use \"[\\\"sunday\\\",\\\"monday\\\"]\"."
+          },
+          "response": [
+            {
+              "name": "Success - Setting Updated",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "PUT",
+                "header": [],
+                "body": {"mode": "raw", "raw": "{\n    \"value\": \"1500\"\n}"}
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 200,\n    \"status\": true,\n    \"message\": \"Setting updated successfully.\",\n    \"body\": {},\n    \"info\": \"from response action\"\n}"
+            },
+            {
+              "name": "Success - Update Array Setting",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "PUT",
+                "header": [],
+                "body": {"mode": "raw", "raw": "{\n    \"value\": \"[\\\"sunday\\\", \\\"monday\\\", \\\"tuesday\\\", \\\"wednesday\\\", \\\"thursday\\\"]\"\n}"}
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"custom_code\": 200,\n    \"status\": true,\n    \"message\": \"Setting updated successfully.\",\n    \"body\": {},\n    \"info\": \"from response action\"\n}"
+            },
+            {
+              "name": "Validation Error - Missing Value",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "PUT",
+                "header": [],
+                "body": {"mode": "raw", "raw": "{}"}
+              },
+              "status": "Unprocessable Entity",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"The given data was invalid.\",\n    \"errors\": {\n        \"value\": [\"The value field is required.\"]\n    }\n}"
+            },
+            {
+              "name": "Not Found - Setting Does Not Exist",
+              "originalRequest": {
+                "auth": {"type": "bearer"},
+                "method": "PUT",
+                "header": []
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [{"key": "Content-Type", "value": "application/json"}],
+              "body": "{\n    \"message\": \"No query results for model [Setting].\"\n}"
+            }
+          ]
+        }
+      ],
+      "description": "System settings management - configure session price, group sizes, schedule, and timeouts"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {"key": "token", "value": "{{token}}", "type": "string"}
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [""]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [""]
+      }
+    }
+  ],
+  "variable": [
+    {"key": "base_url", "value": "http://localhost:8000/api"},
+    {"key": "token", "value": ""},
+    {"key": "session_id", "value": ""},
+    {"key": "notification_id", "value": ""},
+    {"key": "user_id", "value": ""},
+    {"key": "group_id", "value": ""},
+    {"key": "lookup_type", "value": "addiction_duration"}
+  ]
+}

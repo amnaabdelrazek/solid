@@ -1,0 +1,30 @@
+{
+    "name": "nwidart/groups",
+    "description": "",
+    "authors": [
+        {
+            "name": "Nicolas Widart",
+            "email": "n.widart@gmail.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {
+
+            }
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\Groups\\": "app/",
+            "Modules\\Groups\\Database\\Factories\\": "Database/Factories/",
+            "Modules\\Groups\\Database\\Seeders\\": "Database/Seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\Groups\\Tests\\": "tests/"
+        }
+    }
+}

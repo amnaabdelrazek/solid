@@ -1,0 +1,11 @@
+{
+    "Auth": true,
+    "Groups": true,
+    "Lookups": true,
+    "Notifications": true,
+    "Payments": true,
+    "Recommendations": true,
+    "DTOs": true,
+    "Sessions": true,
+    "User": true
+}

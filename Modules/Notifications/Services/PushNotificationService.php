@@ -36,6 +36,9 @@ final class PushNotificationService
 
     private function dispatch(string $token, string $title, string $body): void
     {
+        // FCM is disabled temporarily until Firebase credentials are ready.
+        return;
+
         $response = Http::withToken($this->serverKey)
             ->post('https://fcm.googleapis.com/fcm/send', [
                 'to' => $token,

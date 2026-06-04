@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Solid.Api.Common;
+using Solid.Api.Database.Repositories;
 using Solid.Api.Features.Shared;
 using Solid.Api.Infrastructure.Auth;
-using Solid.Api.Database;
 
 namespace Solid.Api.Features.Auth;
 
@@ -28,7 +28,7 @@ public static class AuthSlice
         return api;
     }
 
-    private static async Task<IResult> Register([FromBody] RegisterRequest request, IAuthService authService, IDatabase database)
+    private static async Task<IResult> Register([FromBody] RegisterRequest request, IAuthService authService, ILookupRepository lookupRepository)
     {
         if (string.IsNullOrWhiteSpace(request.display_name) ||
             string.IsNullOrWhiteSpace(request.mobile_number) ||
@@ -39,7 +39,14 @@ public static class AuthSlice
             return ApiResponse.Fail("The given data was invalid.", StatusCodes.Status422UnprocessableEntity);
         }
 
-        var validationMessage = await ValidateRegistrationReferencesAsync(request, database);
+        if (!PhoneNumberValidator.TryNormalize(request.mobile_number, out var normalizedMobileNumber))
+        {
+            return ApiResponse.Fail(PhoneNumberValidator.Message, StatusCodes.Status422UnprocessableEntity);
+        }
+
+        request = request with { mobile_number = normalizedMobileNumber };
+
+        var validationMessage = await ValidateRegistrationReferencesAsync(request, lookupRepository);
         if (validationMessage is not null)
         {
             return ApiResponse.Fail(validationMessage, StatusCodes.Status422UnprocessableEntity);
@@ -55,18 +62,12 @@ public static class AuthSlice
             return SmsFailure(exception);
         }
 
-        return ApiResponse.Ok(new { user = payload.User, token = payload.Token, token_type = payload.TokenType }, "Register success.");
+        return ApiResponse.Ok(new { user = payload.User, token = payload.Token, token_type = payload.TokenType }, "Registration successful.");
     }
 
-    private static async Task<string?> ValidateRegistrationReferencesAsync(RegisterRequest request, IDatabase database)
+    private static async Task<string?> ValidateRegistrationReferencesAsync(RegisterRequest request, ILookupRepository lookupRepository)
     {
-        var lookupCount = await database.ExecuteScalarAsync<int>(
-            """
-            SELECT COUNT(*)
-            FROM lookup_values
-            WHERE id IN (@addiction_duration_id, @education_level_id)
-            """,
-            new { request.addiction_duration_id, request.education_level_id });
+        var lookupCount = await lookupRepository.CountLookupValuesAsync([request.addiction_duration_id, request.education_level_id]);
 
         if (lookupCount < 2)
         {
@@ -74,16 +75,7 @@ public static class AuthSlice
         }
 
         var substanceIds = request.substance_ids.Distinct().ToArray();
-        var substanceCount = await database.ExecuteScalarAsync<int>(
-            """
-            SELECT COUNT(*)
-            FROM substances
-            WHERE id IN (
-                SELECT TRY_CAST([value] AS BIGINT)
-                FROM STRING_SPLIT(@substanceIds, ',')
-            )
-            """,
-            new { substanceIds = string.Join(',', substanceIds) });
+        var substanceCount = await lookupRepository.CountSubstancesAsync(substanceIds);
 
         if (substanceCount < substanceIds.Length)
         {
@@ -93,16 +85,7 @@ public static class AuthSlice
         if (request.treatment_type_ids is { Length: > 0 })
         {
             var treatmentTypeIds = request.treatment_type_ids.Distinct().ToArray();
-            var treatmentTypeCount = await database.ExecuteScalarAsync<int>(
-                """
-                SELECT COUNT(*)
-                FROM lookup_values
-                WHERE id IN (
-                    SELECT TRY_CAST([value] AS BIGINT)
-                    FROM STRING_SPLIT(@treatmentTypeIds, ',')
-                )
-                """,
-                new { treatmentTypeIds = string.Join(',', treatmentTypeIds) });
+            var treatmentTypeCount = await lookupRepository.CountLookupValuesAsync(treatmentTypeIds);
 
             if (treatmentTypeCount < treatmentTypeIds.Length)
             {
@@ -118,7 +101,7 @@ public static class AuthSlice
         var token = httpRequest.Headers.Authorization.FirstOrDefault()?.Replace("Bearer ", "", StringComparison.OrdinalIgnoreCase);
         if (string.IsNullOrWhiteSpace(token))
         {
-            return ApiResponse.Fail("Invalid OTP.", StatusCodes.Status422UnprocessableEntity);
+            return ApiResponse.Fail("Invalid OTP provided.", StatusCodes.Status422UnprocessableEntity);
         }
 
         try
@@ -127,14 +110,21 @@ public static class AuthSlice
         }
         catch
         {
-            return ApiResponse.Fail("Invalid OTP.", StatusCodes.Status422UnprocessableEntity);
+            return ApiResponse.Fail("Invalid OTP provided.", StatusCodes.Status422UnprocessableEntity);
         }
 
-        return ApiResponse.Ok(message: "Register success.");
+        return ApiResponse.Ok(message: "Registration successful.");
     }
 
     private static async Task<IResult> Login([FromBody] LoginRequest request, IAuthService authService)
     {
+        if (!PhoneNumberValidator.TryNormalize(request.mobile_number, out var normalizedMobileNumber))
+        {
+            return ApiResponse.Fail(PhoneNumberValidator.Message, StatusCodes.Status422UnprocessableEntity);
+        }
+
+        request = request with { mobile_number = normalizedMobileNumber };
+
         var payload = await authService.LoginAsync(request);
         if (payload is null)
         {
@@ -146,6 +136,13 @@ public static class AuthSlice
 
     private static async Task<IResult> ForgotPassword([FromBody] ForgotPasswordRequest request, IAuthService authService)
     {
+        if (!PhoneNumberValidator.TryNormalize(request.mobile_number, out var normalizedMobileNumber))
+        {
+            return ApiResponse.Fail(PhoneNumberValidator.Message, StatusCodes.Status422UnprocessableEntity);
+        }
+
+        request = request with { mobile_number = normalizedMobileNumber };
+
         string? token;
         try
         {
@@ -161,7 +158,7 @@ public static class AuthSlice
             return ApiResponse.Fail("Not found.", StatusCodes.Status404NotFound);
         }
 
-        return ApiResponse.Ok(new { token }, "OTP sent.");
+        return ApiResponse.Ok(new { token }, "OTP has been sent to your mobile number.");
     }
 
     private static async Task<IResult> VerifyForgotOtp([FromBody] VerifyForgotOtpRequest request, IAuthService authService)
@@ -169,32 +166,32 @@ public static class AuthSlice
         var resetToken = await authService.VerifyForgotOtpAsync(request);
         if (resetToken is null)
         {
-            return ApiResponse.Fail("Invalid OTP.", StatusCodes.Status422UnprocessableEntity);
+            return ApiResponse.Fail("Invalid OTP provided.", StatusCodes.Status422UnprocessableEntity);
         }
 
-        return ApiResponse.Ok(new { reset_token = resetToken }, "OTP verified.");
+        return ApiResponse.Ok(new { reset_token = resetToken }, "OTP verified successfully.");
     }
 
     private static async Task<IResult> ResetPassword([FromBody] ResetPasswordRequest request, IAuthService authService)
     {
         if (!await authService.ResetPasswordAsync(request))
         {
-            return ApiResponse.Fail("Expired OTP.", StatusCodes.Status422UnprocessableEntity);
+            return ApiResponse.Fail("OTP has expired. Please request a new one.", StatusCodes.Status422UnprocessableEntity);
         }
 
-        return ApiResponse.Ok(message: "Password reset successfully.");
+        return ApiResponse.Ok(message: "Password has been reset successfully.");
     }
 
-    private static async Task<IResult> Logout(IAuthContext auth, IDatabase database)
+    private static async Task<IResult> Logout(IAuthContext auth, IAuthRepository authRepository)
     {
-        await database.ExecuteAsync("UPDATE users SET active_device_id = NULL, updated_at = SYSDATETIME() WHERE id = @userId", new { auth.UserId });
+        await authRepository.ClearActiveDeviceAsync(auth.UserId);
 
         return ApiResponse.Ok(message: "Logged out successfully");
     }
 
-    private static async Task<IResult> Me(IAuthContext auth, IDatabase database)
+    private static async Task<IResult> Me(IAuthContext auth, IUserRepository userRepository)
     {
-        var user = await database.UserAsync(auth.UserId);
+        var user = await userRepository.FindAsync(auth.UserId);
 
         return ApiResponse.Ok(new { user = UserResource.From(user!) });
     }
@@ -203,12 +200,15 @@ public static class AuthSlice
     {
         await authService.DeleteAccountAsync(auth.UserId);
 
-        return ApiResponse.Ok(message: "Account deleted.");
+        return ApiResponse.Ok(message: "Account deleted successfully.");
     }
 
     private static IResult SmsFailure(InvalidOperationException exception)
     {
-        var statusCode = exception.Message.StartsWith("SMS is not configured", StringComparison.OrdinalIgnoreCase)
+        var statusCode = exception.Message.Contains("phone number", StringComparison.OrdinalIgnoreCase) ||
+                         exception.Message.Contains("E.164", StringComparison.OrdinalIgnoreCase) ||
+                         exception.Message.Contains("SMS provider rejected", StringComparison.OrdinalIgnoreCase) ||
+                         exception.Message.StartsWith("SMS is not configured", StringComparison.OrdinalIgnoreCase)
             ? StatusCodes.Status422UnprocessableEntity
             : StatusCodes.Status502BadGateway;
 

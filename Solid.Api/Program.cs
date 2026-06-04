@@ -55,16 +55,22 @@ builder.Services.AddSwaggerGen(options =>
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSignalR();
-builder.Services.AddHttpClient<ISmsSender, TwilioSmsSender>();
+if (builder.Configuration["Sms:Provider"]?.Equals("Twilio", StringComparison.OrdinalIgnoreCase) == true)
+{
+    builder.Services.AddScoped<ISmsSender, TwilioVerifySender>();
+}
+else
+{
+    builder.Services.AddScoped<ISmsSender, LocalOtpSender>();
+}
 builder.Services.AddDbContext<SolidDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 #region DI
-builder.Services.AddSingleton<ISqlConnectionFactory, SqlConnectionFactory>();
-builder.Services.AddScoped<IDatabase, SqlDatabase>();
 builder.Services.AddScoped<IAuthContext, JwtAuthContext>();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IAuthRepository, AuthRepository>();
+builder.Services.AddScoped<ICacheRepository, CacheRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<ISettingsRepository, SettingsRepository>();
 builder.Services.AddScoped<ILookupRepository, LookupRepository>();

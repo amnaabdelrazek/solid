@@ -1,14 +1,16 @@
+using Solid.Api.Database.Entities;
+
 namespace Solid.Api.Database.Repositories;
 
 public interface IGroupRepository
 {
-    Task<IReadOnlyList<Dictionary<string, object?>>> ListAsync();
+    Task<IReadOnlyList<Group>> ListAsync();
 
-    Task<Dictionary<string, object?>?> MyGroupAsync(long userId);
+    Task<Group?> MyGroupAsync(long userId);
 
     Task<bool> HasActiveMembershipAsync(long userId);
 
-    Task<Dictionary<string, object?>> FindOrCreateOpenAsync();
+    Task<Group> FindOrCreateOpenAsync();
 
-    Task AddMemberAsync(object groupId, long userId);
+    Task AddMemberAsync(long groupId, long userId);
 }

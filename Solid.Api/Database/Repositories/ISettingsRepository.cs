@@ -1,3 +1,5 @@
+using Solid.Api.Database.Entities;
+
 namespace Solid.Api.Database.Repositories;
 
 public interface ISettingsRepository
@@ -6,5 +8,5 @@ public interface ISettingsRepository
 
     Task SetAsync(string group, string name, object? value);
 
-    Task<IReadOnlyList<Dictionary<string, object?>>> NotificationsAsync(long userId);
+    Task<IReadOnlyList<Notification>> NotificationsAsync(long userId);
 }

@@ -1,22 +1,23 @@
 using Solid.Api.Common;
+using Solid.Api.Database.Entities;
 
 namespace Solid.Api.Features.Settings;
 
 public static class NotificationResource
 {
-    public static object From(Dictionary<string, object?> notification)
+    public static object From(Notification notification)
     {
-        var data = notification.JsonValue("data") as Dictionary<string, object?> ?? [];
+        var data = JsonPayload.ParseObject(notification.Data);
 
         return new
         {
-            id = notification["id"],
+            id = notification.Id,
             title = data.GetValueOrDefault("title") ?? "Notification",
             body = data.GetValueOrDefault("body") ?? "",
             type = data.GetValueOrDefault("type") ?? "info",
             icon = data.GetValueOrDefault("icon") ?? "bell",
-            read_at = notification.GetValueOrDefault("read_at"),
-            created_at = notification.GetValueOrDefault("created_at"),
+            read_at = notification.ReadAt,
+            created_at = notification.CreatedAt,
             created_at_human = ""
         };
     }

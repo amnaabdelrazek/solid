@@ -1,52 +1,74 @@
+using Microsoft.EntityFrameworkCore;
+using Solid.Api.Database.Entities;
+
 namespace Solid.Api.Database.Repositories;
 
-public sealed class GroupRepository(IDatabase database) : IGroupRepository
+public sealed class GroupRepository(SolidDbContext dbContext) : IGroupRepository
 {
-    public async Task<IReadOnlyList<Dictionary<string, object?>>> ListAsync()
+    public async Task<IReadOnlyList<Group>> ListAsync()
     {
-        return await database.QueryAsync("SELECT * FROM groups WHERE deleted_at IS NULL ORDER BY id DESC");
+        return await dbContext.Groups
+            .AsNoTracking()
+            .Where(group => group.DeletedAt == null)
+            .OrderByDescending(group => group.Id)
+            .ToListAsync();
     }
 
-    public async Task<Dictionary<string, object?>?> MyGroupAsync(long userId)
+    public async Task<Group?> MyGroupAsync(long userId)
     {
-        return await database.QuerySingleAsync(
-            """
-            SELECT TOP 1 g.*
-            FROM groups g
-            INNER JOIN group_members gm ON gm.group_id = g.id
-            WHERE gm.user_id = @userId AND gm.is_active = 1 AND g.deleted_at IS NULL
-            ORDER BY gm.joined_at DESC
-            """,
-            new { userId });
+        return await dbContext.GroupMembers
+            .AsNoTracking()
+            .Where(member => member.UserId == userId && member.IsActive && member.Group.DeletedAt == null)
+            .OrderByDescending(member => member.JoinedAt)
+            .Select(member => member.Group)
+            .FirstOrDefaultAsync();
     }
 
     public async Task<bool> HasActiveMembershipAsync(long userId)
     {
-        return await database.QuerySingleAsync("SELECT TOP 1 id FROM group_members WHERE user_id = @userId AND is_active = 1", new { userId }) is not null;
+        return await dbContext.GroupMembers.AnyAsync(member => member.UserId == userId && member.IsActive);
     }
 
-    public async Task<Dictionary<string, object?>> FindOrCreateOpenAsync()
+    public async Task<Group> FindOrCreateOpenAsync()
     {
-        var group = await database.QuerySingleAsync("SELECT TOP 1 * FROM groups WHERE [status] = 'forming' AND deleted_at IS NULL ORDER BY id");
+        var group = await dbContext.Groups
+            .Where(group => group.Status == "forming" && group.DeletedAt == null)
+            .OrderBy(group => group.Id)
+            .FirstOrDefaultAsync();
+
         if (group is not null)
         {
             return group;
         }
 
-        var groupId = await database.ExecuteScalarAsync<long>(
-            """
-            INSERT INTO groups (group_type, [status], name_ar, name_en, min_members, max_members, created_at, updated_at)
-            OUTPUT INSERTED.id
-            VALUES ('mixed', 'forming', N'مجموعة جديدة', 'New Group', 7, 15, SYSDATETIME(), SYSDATETIME())
-            """);
+        group = new Group
+        {
+            GroupType = "mixed",
+            Status = "forming",
+            NameAr = "مجموعة جديدة",
+            NameEn = "New Group",
+            MinMembers = 7,
+            MaxMembers = 15,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
 
-        return (await database.QuerySingleAsync("SELECT TOP 1 * FROM groups WHERE id = @groupId", new { groupId }))!;
+        dbContext.Groups.Add(group);
+        await dbContext.SaveChangesAsync();
+
+        return group;
     }
 
-    public async Task AddMemberAsync(object groupId, long userId)
+    public async Task AddMemberAsync(long groupId, long userId)
     {
-        await database.ExecuteAsync(
-            "INSERT INTO group_members (group_id, user_id, joined_at, is_active) VALUES (@groupId, @userId, SYSDATETIME(), 1)",
-            new { groupId, userId });
+        dbContext.GroupMembers.Add(new GroupMember
+        {
+            GroupId = groupId,
+            UserId = userId,
+            JoinedAt = DateTime.UtcNow,
+            IsActive = true
+        });
+
+        await dbContext.SaveChangesAsync();
     }
 }

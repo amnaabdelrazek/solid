@@ -1,16 +1,18 @@
+using Solid.Api.Database.Entities;
+
 namespace Solid.Api.Features.Payments;
 
 public static class PaymentMethodResource
 {
-    public static object From(Dictionary<string, object?> method)
+    public static object From(PaymentMethod method)
     {
         return new
         {
-            id = method["id"],
-            card_holder = method.GetValueOrDefault("card_type"),
-            card_number = method.GetValueOrDefault("card_number"),
-            expiry = method.GetValueOrDefault("expiry"),
-            is_default = method.GetValueOrDefault("is_default")
+            id = method.Id,
+            card_holder = method.CardHolder ?? method.CardType,
+            card_number = method.CardNumber,
+            expiry = method.Expiry,
+            is_default = method.IsDefault
         };
     }
 }

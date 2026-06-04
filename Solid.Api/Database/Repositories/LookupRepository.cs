@@ -1,44 +1,57 @@
+using Microsoft.EntityFrameworkCore;
+using Solid.Api.Database.Entities;
+
 namespace Solid.Api.Database.Repositories;
 
-public sealed class LookupRepository(IDatabase database) : ILookupRepository
+public sealed class LookupRepository(SolidDbContext dbContext) : ILookupRepository
 {
-    public async Task<IReadOnlyList<Dictionary<string, object?>>> SubstanceCategoriesAsync()
+    public async Task<IReadOnlyList<SubstanceCategory>> SubstanceCategoriesAsync()
     {
-        return await database.QueryAsync(
-            """
-            SELECT id, name_ar, name_en
-            FROM substance_categories
-            WHERE is_active = 1
-            ORDER BY sort_order, id
-            """);
+        return await dbContext.SubstanceCategories
+            .AsNoTracking()
+            .Where(category => category.IsActive)
+            .OrderBy(category => category.SortOrder)
+            .ThenBy(category => category.Id)
+            .ToListAsync();
     }
 
-    public async Task<IReadOnlyList<Dictionary<string, object?>>> SubstancesAsync(object categoryId)
+    public async Task<IReadOnlyList<Substance>> SubstancesAsync(long categoryId)
     {
-        return await database.QueryAsync(
-            """
-            SELECT id, name_ar, name_en
-            FROM substances
-            WHERE substance_category_id = @categoryId AND is_active = 1
-            ORDER BY id
-            """,
-            new { categoryId });
+        return await dbContext.Substances
+            .AsNoTracking()
+            .Where(substance => substance.SubstanceCategoryId == categoryId && substance.IsActive)
+            .OrderBy(substance => substance.Id)
+            .ToListAsync();
     }
 
-    public async Task<Dictionary<string, object?>?> LookupTypeAsync(string type)
+    public async Task<LookupType?> LookupTypeAsync(string type)
     {
-        return await database.QuerySingleAsync("SELECT TOP 1 id FROM lookup_types WHERE [key] = @type", new { type });
+        return await dbContext.LookupTypes
+            .AsNoTracking()
+            .FirstOrDefaultAsync(lookupType => lookupType.Key == type);
     }
 
-    public async Task<IReadOnlyList<Dictionary<string, object?>>> LookupValuesAsync(object lookupTypeId)
+    public async Task<IReadOnlyList<LookupValue>> LookupValuesAsync(long lookupTypeId)
     {
-        return await database.QueryAsync(
-            """
-            SELECT id, value_key, label_ar, label_en
-            FROM lookup_values
-            WHERE lookup_type_id = @lookupTypeId AND is_active = 1
-            ORDER BY sort_order, id
-            """,
-            new { lookupTypeId });
+        return await dbContext.LookupValues
+            .AsNoTracking()
+            .Where(value => value.LookupTypeId == lookupTypeId && value.IsActive)
+            .OrderBy(value => value.SortOrder)
+            .ThenBy(value => value.Id)
+            .ToListAsync();
+    }
+
+    public async Task<int> CountLookupValuesAsync(IEnumerable<long> lookupValueIds)
+    {
+        var ids = lookupValueIds.Distinct().ToArray();
+
+        return await dbContext.LookupValues.CountAsync(value => ids.Contains(value.Id));
+    }
+
+    public async Task<int> CountSubstancesAsync(IEnumerable<long> substanceIds)
+    {
+        var ids = substanceIds.Distinct().ToArray();
+
+        return await dbContext.Substances.CountAsync(substance => ids.Contains(substance.Id));
     }
 }

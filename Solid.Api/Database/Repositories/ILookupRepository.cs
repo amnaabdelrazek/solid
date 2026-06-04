@@ -1,12 +1,18 @@
+using Solid.Api.Database.Entities;
+
 namespace Solid.Api.Database.Repositories;
 
 public interface ILookupRepository
 {
-    Task<IReadOnlyList<Dictionary<string, object?>>> SubstanceCategoriesAsync();
+    Task<IReadOnlyList<SubstanceCategory>> SubstanceCategoriesAsync();
 
-    Task<IReadOnlyList<Dictionary<string, object?>>> SubstancesAsync(object categoryId);
+    Task<IReadOnlyList<Substance>> SubstancesAsync(long categoryId);
 
-    Task<Dictionary<string, object?>?> LookupTypeAsync(string type);
+    Task<LookupType?> LookupTypeAsync(string type);
 
-    Task<IReadOnlyList<Dictionary<string, object?>>> LookupValuesAsync(object lookupTypeId);
+    Task<IReadOnlyList<LookupValue>> LookupValuesAsync(long lookupTypeId);
+
+    Task<int> CountLookupValuesAsync(IEnumerable<long> lookupValueIds);
+
+    Task<int> CountSubstancesAsync(IEnumerable<long> substanceIds);
 }

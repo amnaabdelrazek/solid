@@ -1,47 +1,89 @@
-using System.Net.Http.Headers;
-using System.Text;
+using Twilio;
+using Twilio.Exceptions;
+using Twilio.Rest.Verify.V2.Service;
+using Solid.Api.Common;
 
 namespace Solid.Api.Infrastructure.Sms;
 
-public sealed class TwilioSmsSender(HttpClient httpClient, IConfiguration configuration) : ISmsSender
+public sealed class TwilioVerifySender : ISmsSender
 {
-    public async Task SendAsync(string to, string message)
+    private readonly IConfiguration _configuration;
+
+    public TwilioVerifySender(IConfiguration configuration)
     {
-        var accountSid = Value("Sms:Twilio:AccountSid", "TWILIO_SID");
-        var authToken = Value("Sms:Twilio:AuthToken", "TWILIO_AUTH_TOKEN");
-        var from = Value("Sms:Twilio:From", "TWILIO_FROM");
+        _configuration = configuration;
+
+        var accountSid = _configuration["Sms:Twilio:AccountSid"];
+        var authToken = _configuration["Sms:Twilio:AuthToken"];
 
         if (string.IsNullOrWhiteSpace(accountSid) ||
-            string.IsNullOrWhiteSpace(authToken) ||
-            string.IsNullOrWhiteSpace(from))
+            string.IsNullOrWhiteSpace(authToken))
         {
-            throw new InvalidOperationException("SMS is not configured. Set Sms:Twilio:AccountSid, Sms:Twilio:AuthToken, and Sms:Twilio:From.");
+            throw new InvalidOperationException(
+                "Twilio Verify is not configured.");
         }
 
-        using var request = new HttpRequestMessage(
-            HttpMethod.Post,
-            $"https://api.twilio.com/2010-04-01/Accounts/{accountSid}/Messages.json");
+        TwilioClient.Init(accountSid, authToken);
+    }
 
-        var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{accountSid}:{authToken}"));
-        request.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
-        request.Content = new FormUrlEncodedContent(new Dictionary<string, string>
+    public async Task SendOtpAsync(string phoneNumber)
+    {
+        if (!PhoneNumberValidator.TryNormalize(phoneNumber, out var normalizedPhoneNumber))
         {
-            ["To"] = to,
-            ["From"] = from,
-            ["Body"] = message
-        });
+            throw new InvalidOperationException(PhoneNumberValidator.Message);
+        }
 
-        using var response = await httpClient.SendAsync(request);
-        if (!response.IsSuccessStatusCode)
+        var serviceSid =
+            _configuration["Sms:Twilio:VerifyServiceSid"];
+
+        if (string.IsNullOrWhiteSpace(serviceSid))
         {
-            var body = await response.Content.ReadAsStringAsync();
+            throw new InvalidOperationException(
+                "VerifyServiceSid is missing.");
+        }
 
-            throw new InvalidOperationException($"Twilio SMS failed with {(int)response.StatusCode}: {body}");
+        try
+        {
+            await VerificationResource.CreateAsync(
+                to: normalizedPhoneNumber,
+                channel: "sms",
+                pathServiceSid: serviceSid
+            );
+        }
+        catch (ApiException exception)
+        {
+            throw new InvalidOperationException(
+                $"SMS provider rejected the request: {exception.Message}",
+                exception);
         }
     }
 
-    private string? Value(string configKey, string environmentKey)
+    public async Task<bool> VerifyOtpAsync(
+        string phoneNumber,
+        string otp)
     {
-        return configuration[configKey] ?? Environment.GetEnvironmentVariable(environmentKey);
+        if (!PhoneNumberValidator.TryNormalize(phoneNumber, out var normalizedPhoneNumber))
+        {
+            return false;
+        }
+
+        var serviceSid =
+            _configuration["Sms:Twilio:VerifyServiceSid"];
+
+        try
+        {
+            var result =
+                await VerificationCheckResource.CreateAsync(
+                    to: normalizedPhoneNumber,
+                    code: otp,
+                    pathServiceSid: serviceSid
+                );
+
+            return result.Status == "approved";
+        }
+        catch (ApiException)
+        {
+            return false;
+        }
     }
 }

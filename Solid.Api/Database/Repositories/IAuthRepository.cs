@@ -1,10 +1,14 @@
+using Solid.Api.Database.Entities;
+
 namespace Solid.Api.Database.Repositories;
 
 public interface IAuthRepository
 {
-    Task<Dictionary<string, object?>?> FindUserByMobileAsync(string mobileNumber, bool onlyActive = false);
+    Task<User?> FindUserByIdAsync(long userId);
 
-    Task<Dictionary<string, object?>> CreateInactiveUserAsync(AuthUserCreate create);
+    Task<User?> FindUserByMobileAsync(string mobileNumber, bool onlyActive = false);
+
+    Task<User> CreateInactiveUserAsync(AuthUserCreate create);
 
     Task<bool> HasAddictionProfileAsync(long userId);
 
@@ -13,6 +17,10 @@ public interface IAuthRepository
     Task ActivateUserAsync(long userId);
 
     Task RecordLoginAsync(long userId, string deviceId);
+
+    Task ClearActiveDeviceAsync(long userId);
+
+    Task UpdatePasswordAsync(long userId, string passwordHash);
 
     Task DeactivateAccountAsync(long userId);
 }
@@ -26,5 +34,6 @@ public sealed record AuthUserCreate(
     long EducationLevelId,
     bool HadPriorTreatment,
     long[] SubstanceIds,
+    long[] TreatmentTypeIds,
     string? AddictionReason,
     int? DaysClean);

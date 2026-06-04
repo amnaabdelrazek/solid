@@ -6,7 +6,9 @@ public sealed class PaymentMethod
 
     public long UserId { get; set; }
 
-    public string CardType { get; set; } = string.Empty;
+    public string? CardHolder { get; set; }
+
+    public string? CardType { get; set; }
 
     public string CardNumber { get; set; } = string.Empty;
 

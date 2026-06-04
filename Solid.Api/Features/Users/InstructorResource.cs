@@ -1,19 +1,20 @@
 using Solid.Api.Common;
+using Solid.Api.Database.Entities;
 
 namespace Solid.Api.Features.Users;
 
 public static class InstructorResource
 {
-    public static object From(Dictionary<string, object?> user)
+    public static object From(User user)
     {
         return new
         {
-            id = user["id"],
-            display_name = user.GetValueOrDefault("display_name"),
-            avatar_url = user.GetValueOrDefault("avatar_url"),
-            bio = user.GetValueOrDefault("bio"),
-            experience = user.JsonValue("experience") ?? Array.Empty<object>(),
-            quote = user.GetValueOrDefault("quote")
+            id = user.Id,
+            display_name = user.DisplayName,
+            avatar_url = user.AvatarUrl,
+            bio = user.Bio,
+            experience = JsonPayload.Parse(user.Experience) ?? Array.Empty<object>(),
+            quote = user.Quote
         };
     }
 }

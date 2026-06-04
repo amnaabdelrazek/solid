@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Solid.Api.Common;
+using Solid.Api.Database.Repositories;
 using Solid.Api.Features.Shared;
 using Solid.Api.Infrastructure.Auth;
-using Solid.Api.Database;
 
 namespace Solid.Api.Features.Users;
 
@@ -19,49 +19,46 @@ public static class UserSlice
         return api;
     }
 
-    private static async Task<IResult> CurrentUser(IAuthContext auth, IDatabase database)
+    private static async Task<IResult> CurrentUser(IAuthContext auth, IUserRepository userRepository)
     {
-        return ApiResponse.Ok(await database.UserAsync(auth.UserId));
+        var user = await userRepository.FindAsync(auth.UserId);
+
+        return user is null
+            ? ApiResponse.Fail("Not found.", StatusCodes.Status404NotFound)
+            : ApiResponse.Ok(UserResource.From(user));
     }
 
-    private static async Task<IResult> Show(long userId, IDatabase database)
+    private static async Task<IResult> Show(long userId, IUserRepository userRepository)
     {
-        var user = await database.UserAsync(userId);
+        var user = await userRepository.FindAsync(userId);
 
         return user is null
             ? ApiResponse.Fail("Not found.", StatusCodes.Status404NotFound)
             : ApiResponse.Ok(new { user = UserResource.From(user) });
     }
 
-    private static async Task<IResult> UpdateProfile(IAuthContext auth, [FromBody] ProfileRequest request, IDatabase database)
+    private static async Task<IResult> UpdateProfile(IAuthContext auth, [FromBody] ProfileRequest request, IUserRepository userRepository)
     {
-        await database.ExecuteAsync(
-            """
-            UPDATE users
-            SET display_name = COALESCE(@display_name, display_name),
-                email = COALESCE(@email, email),
-                mobile_number = COALESCE(@mobile_number, mobile_number),
-                bio = COALESCE(@bio, bio),
-                avatar_url = COALESCE(@avatar_url, avatar_url),
-                updated_at = SYSDATETIME()
-            WHERE id = @userId
-            """,
-            new { auth.UserId, request.display_name, request.email, request.mobile_number, request.bio, request.avatar_url });
+        await userRepository.UpdateProfileAsync(
+            auth.UserId,
+            new ProfileUpdate(request.display_name, request.email, request.mobile_number, request.bio, request.avatar_url));
 
-        return ApiResponse.Ok(new { user = UserResource.From((await database.UserAsync(auth.UserId))!) }, "Profile updated successfully.");
+        var user = await userRepository.FindAsync(auth.UserId);
+
+        return ApiResponse.Ok(new { user = UserResource.From(user!) }, "Profile updated successfully.");
     }
 
-    private static async Task<IResult> Instructors(IDatabase database)
+    private static async Task<IResult> Instructors(IUserRepository userRepository)
     {
-        var instructors = await database.QueryAsync("SELECT * FROM users WHERE [role] = 'instructor' AND deleted_at IS NULL ORDER BY id");
+        var instructors = await userRepository.InstructorsAsync();
 
         return ApiResponse.Ok(new { instructors = instructors.Select(InstructorResource.From) });
     }
 
-    private static async Task<IResult> ShowInstructor(long userId, IDatabase database)
+    private static async Task<IResult> ShowInstructor(long userId, IUserRepository userRepository)
     {
-        var user = await database.UserAsync(userId);
-        if (user is null || Convert.ToString(user["role"]) != "instructor")
+        var user = await userRepository.FindAsync(userId);
+        if (user is null || user.Role != "instructor")
         {
             return ApiResponse.Fail("User is not an instructor.", StatusCodes.Status404NotFound);
         }

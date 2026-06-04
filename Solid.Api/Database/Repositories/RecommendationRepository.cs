@@ -1,9 +1,16 @@
+using Microsoft.EntityFrameworkCore;
+using Solid.Api.Database.Entities;
+
 namespace Solid.Api.Database.Repositories;
 
-public sealed class RecommendationRepository(IDatabase database) : IRecommendationRepository
+public sealed class RecommendationRepository(SolidDbContext dbContext) : IRecommendationRepository
 {
-    public async Task<IReadOnlyList<Dictionary<string, object?>>> ActiveAsync()
+    public async Task<IReadOnlyList<Recommendation>> ActiveAsync()
     {
-        return await database.QueryAsync("SELECT * FROM recommendations WHERE is_active = 1 ORDER BY id");
+        return await dbContext.Recommendations
+            .AsNoTracking()
+            .Where(recommendation => recommendation.IsActive)
+            .OrderBy(recommendation => recommendation.Id)
+            .ToListAsync();
     }
 }

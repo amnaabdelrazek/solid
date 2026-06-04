@@ -1,5 +1,6 @@
 using Solid.Api.Common;
-using Solid.Api.Database;
+using Solid.Api.Database.Entities;
+using Solid.Api.Database.Repositories;
 
 namespace Solid.Api.Features.Lookups;
 
@@ -13,67 +14,71 @@ public static class LookupSlice
         return api;
     }
 
-    private static async Task<IResult> Substances(HttpRequest request, IDatabase database)
+    private static async Task<IResult> Substances(HttpRequest request, ILookupRepository lookupRepository)
     {
         var locale = RequestCulture.Locale(request);
-        var categories = (await database.QueryAsync(
-            """
-            SELECT id, name_ar, name_en
-            FROM substance_categories
-            WHERE is_active = 1
-            ORDER BY sort_order, id
-            """)).Select(row => new Dictionary<string, object?>(row, StringComparer.OrdinalIgnoreCase)).ToList();
+        var categories = await lookupRepository.SubstanceCategoriesAsync();
 
-        foreach (var category in categories)
+        return ApiResponse.Ok(new
         {
-            var substances = await database.QueryAsync(
-                """
-                SELECT id, name_ar, name_en
-                FROM substances
-                WHERE substance_category_id = @categoryId AND is_active = 1
-                ORDER BY id
-                """,
-                new { categoryId = category["id"] });
-
-            category["label"] = category.Translated("name", locale);
-            category["substances"] = substances.Select(substance => new
+            categories = await Task.WhenAll(categories.Select(async category =>
             {
-                id = substance["id"],
-                label = substance.Translated("name", locale)
-            });
-            category.Remove("name_ar");
-            category.Remove("name_en");
-        }
+                var substances = await lookupRepository.SubstancesAsync(category.Id);
 
-        return ApiResponse.Ok(new { categories });
+                return new
+                {
+                    id = category.Id,
+                    label = TranslatedName(category, locale),
+                    substances = substances.Select(substance => new
+                    {
+                        id = substance.Id,
+                        label = TranslatedName(substance, locale)
+                    })
+                };
+            }))
+        });
     }
 
-    private static async Task<IResult> ByType(string type, HttpRequest request, IDatabase database)
+    private static async Task<IResult> ByType(string type, HttpRequest request, ILookupRepository lookupRepository)
     {
         var locale = RequestCulture.Locale(request);
-        var lookupType = await database.QuerySingleAsync("SELECT TOP 1 id FROM lookup_types WHERE [key] = @type", new { type });
+        var lookupType = await lookupRepository.LookupTypeAsync(type);
         if (lookupType is null)
         {
             return ApiResponse.Fail("Not found.", StatusCodes.Status404NotFound);
         }
 
-        var values = await database.QueryAsync(
-            """
-            SELECT id, value_key, label_ar, label_en
-            FROM lookup_values
-            WHERE lookup_type_id = @lookupTypeId AND is_active = 1
-            ORDER BY sort_order, id
-            """,
-            new { lookupTypeId = lookupType["id"] });
+        var values = await lookupRepository.LookupValuesAsync(lookupType.Id);
 
         return ApiResponse.Ok(new
         {
             values = values.Select(value => new
             {
-                id = value["id"],
-                value_key = value["value_key"],
-                label = value.Translated("label", locale)
+                id = value.Id,
+                value_key = value.ValueKey,
+                label = TranslatedLabel(value, locale)
             })
         });
+    }
+
+    private static string TranslatedName(SubstanceCategory category, string locale)
+    {
+        return locale == "en" && !string.IsNullOrWhiteSpace(category.NameEn)
+            ? category.NameEn
+            : category.NameAr;
+    }
+
+    private static string TranslatedName(Substance substance, string locale)
+    {
+        return locale == "en" && !string.IsNullOrWhiteSpace(substance.NameEn)
+            ? substance.NameEn
+            : substance.NameAr;
+    }
+
+    private static string TranslatedLabel(LookupValue value, string locale)
+    {
+        return locale == "en" && !string.IsNullOrWhiteSpace(value.LabelEn)
+            ? value.LabelEn
+            : value.LabelAr;
     }
 }

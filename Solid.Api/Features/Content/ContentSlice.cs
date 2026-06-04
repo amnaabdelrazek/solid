@@ -1,6 +1,5 @@
 using Solid.Api.Common;
-using Solid.Api.Features.Shared;
-using Solid.Api.Database;
+using Solid.Api.Database.Repositories;
 
 namespace Solid.Api.Features.Content;
 
@@ -14,16 +13,16 @@ public static class ContentSlice
         return api;
     }
 
-    private static async Task<IResult> PrivacyPolicy(IDatabase database)
+    private static async Task<IResult> PrivacyPolicy(ISettingsRepository settingsRepository)
     {
-        var value = await database.SettingAsync("content", "privacy_policy");
+        var value = await settingsRepository.GetAsync("content", "privacy_policy");
 
         return ApiResponse.Ok(new { privacy_policy = value ?? string.Empty });
     }
 
-    private static async Task<IResult> TermsAndConditions(IDatabase database)
+    private static async Task<IResult> TermsAndConditions(ISettingsRepository settingsRepository)
     {
-        var value = await database.SettingAsync("content", "terms_and_conditions");
+        var value = await settingsRepository.GetAsync("content", "terms_and_conditions");
 
         return ApiResponse.Ok(new { terms_and_conditions = value ?? string.Empty });
     }

@@ -2,5 +2,6 @@ namespace Solid.Api.Infrastructure.Sms;
 
 public interface ISmsSender
 {
-    Task SendAsync(string to, string message);
+    Task SendOtpAsync(string phoneNumber);
+    Task<bool> VerifyOtpAsync(string phoneNumber, string otp);
 }

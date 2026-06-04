@@ -66,11 +66,13 @@ public sealed class SolidDbContext(DbContextOptions<SolidDbContext> options) : D
             entity.ToTable("users");
             entity.HasKey(user => user.Id);
             entity.HasIndex(user => user.MobileNumber).IsUnique().HasFilter("[mobile_number] IS NOT NULL");
+            entity.HasIndex(user => user.Email).IsUnique().HasFilter("[email] IS NOT NULL");
             entity.HasIndex(user => user.Username).IsUnique().HasFilter("[username] IS NOT NULL");
 
             entity.Property(user => user.Id).HasColumnName("id");
             entity.Property(user => user.DisplayName).HasColumnName("display_name").HasMaxLength(150);
             entity.Property(user => user.MobileNumber).HasColumnName("mobile_number").HasMaxLength(20);
+            entity.Property(user => user.Email).HasColumnName("email").HasMaxLength(255);
             entity.Property(user => user.Username).HasColumnName("username").HasMaxLength(80);
             entity.Property(user => user.Password).HasColumnName("password");
             entity.Property(user => user.Role).HasColumnName("role").HasMaxLength(50);
@@ -439,6 +441,7 @@ public sealed class SolidDbContext(DbContextOptions<SolidDbContext> options) : D
 
             entity.Property(method => method.Id).HasColumnName("id");
             entity.Property(method => method.UserId).HasColumnName("user_id");
+            entity.Property(method => method.CardHolder).HasColumnName("card_holder").HasMaxLength(255);
             entity.Property(method => method.CardType).HasColumnName("card_type");
             entity.Property(method => method.CardNumber).HasColumnName("card_number");
             entity.Property(method => method.Expiry).HasColumnName("expiry");

@@ -1,57 +1,117 @@
-using System.Security.Cryptography;
-using Solid.Api.Database;
-using Solid.Api.Features.Shared;
+using Solid.Api.Database.Repositories;
 using Solid.Api.Infrastructure.Sms;
 
 namespace Solid.Api.Features.Auth;
 
-public sealed class OtpService(IDatabase database, ISmsSender smsSender, IConfiguration configuration) : IOtpService
+public sealed class OtpService(
+    IAuthRepository authRepository,
+    ISmsSender smsSender,
+    IConfiguration configuration,
+    ILogger<OtpService> logger)
+    : IOtpService
 {
-    public async Task SendRegistrationOtpAsync(long userId, string? mobileNumber)
-    {
-        await SendOtpAsync($"otp:{userId}", mobileNumber);
-    }
-
-    public async Task<bool> VerifyRegistrationOtpAsync(long userId, string otp)
-    {
-        return await VerifyOtpAsync($"otp:{userId}", otp);
-    }
-
-    public async Task SendPasswordResetOtpAsync(long userId, string? mobileNumber)
-    {
-        await SendOtpAsync($"password_reset_otp:{userId}", mobileNumber);
-    }
-
-    public async Task<bool> VerifyPasswordResetOtpAsync(string userId, string otp)
-    {
-        return await VerifyOtpAsync($"password_reset_otp:{userId}", otp);
-    }
-
-    private async Task SendOtpAsync(string cacheKey, string? mobileNumber)
+    public async Task SendRegistrationOtpAsync(
+        long userId,
+        string? mobileNumber)
     {
         if (string.IsNullOrWhiteSpace(mobileNumber))
         {
-            throw new InvalidOperationException("User has no mobile number.");
+            throw new InvalidOperationException(
+                "User has no mobile number.");
         }
 
-        var otp = GenerateOtp();
-        var ttlSeconds = int.TryParse(configuration["Otp:TtlSeconds"], out var configuredTtl)
-            ? configuredTtl
-            : 300;
+        if (TryUseFixedOtp(out var fixedOtp))
+        {
+            logger.LogWarning("DEV FIXED OTP for registration user {UserId}: {Otp}", userId, fixedOtp);
 
-        await database.PutCacheAsync(cacheKey, otp, ttlSeconds);
-        await smsSender.SendAsync(mobileNumber, $"Your OTP code is: {otp}");
+            return;
+        }
+
+        await smsSender.SendOtpAsync(mobileNumber);
     }
 
-    private async Task<bool> VerifyOtpAsync(string cacheKey, string otp)
+    public async Task<bool> VerifyRegistrationOtpAsync(
+        long userId,
+        string otp)
     {
-        var storedOtp = await database.GetCacheAsync(cacheKey);
+        var user = await authRepository.FindUserByIdAsync(userId);
 
-        return !string.IsNullOrWhiteSpace(storedOtp) && storedOtp == otp;
+        if (user is null)
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(user.MobileNumber))
+        {
+            return false;
+        }
+
+        if (TryUseFixedOtp(out var fixedOtp))
+        {
+            return string.Equals(otp, fixedOtp, StringComparison.Ordinal);
+        }
+
+        return await smsSender.VerifyOtpAsync(
+            user.MobileNumber,
+            otp);
     }
 
-    private static string GenerateOtp()
+    public async Task SendPasswordResetOtpAsync(
+        long userId,
+        string? mobileNumber)
     {
-        return RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
+        if (string.IsNullOrWhiteSpace(mobileNumber))
+        {
+            throw new InvalidOperationException(
+                "User has no mobile number.");
+        }
+
+        if (TryUseFixedOtp(out var fixedOtp))
+        {
+            logger.LogWarning("DEV FIXED OTP for password reset user {UserId}: {Otp}", userId, fixedOtp);
+
+            return;
+        }
+
+        await smsSender.SendOtpAsync(mobileNumber);
+    }
+
+    public async Task<bool> VerifyPasswordResetOtpAsync(
+        string userId,
+        string otp)
+    {
+        if (!long.TryParse(userId, out var id))
+        {
+            return false;
+        }
+
+        var user = await authRepository.FindUserByIdAsync(id);
+
+        if (user is null)
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(user.MobileNumber))
+        {
+            return false;
+        }
+
+        if (TryUseFixedOtp(out var fixedOtp))
+        {
+            return string.Equals(otp, fixedOtp, StringComparison.Ordinal);
+        }
+
+        return await smsSender.VerifyOtpAsync(
+            user.MobileNumber,
+            otp);
+    }
+
+    private bool TryUseFixedOtp(out string fixedOtp)
+    {
+        fixedOtp = configuration["Otp:FixedCode"] ?? string.Empty;
+
+        return configuration.GetValue<bool>("Otp:UseFixedCode") &&
+               !string.IsNullOrWhiteSpace(fixedOtp);
     }
 }

@@ -1,87 +1,190 @@
-using Solid.Api.Features.Shared;
+using Microsoft.EntityFrameworkCore;
+using Solid.Api.Database.Entities;
 
 namespace Solid.Api.Database.Repositories;
 
-public sealed class AuthRepository(IDatabase database) : IAuthRepository
+public sealed class AuthRepository(SolidDbContext dbContext) : IAuthRepository
 {
-    public async Task<Dictionary<string, object?>?> FindUserByMobileAsync(string mobileNumber, bool onlyActive = false)
+    public async Task<User?> FindUserByIdAsync(long userId)
     {
-        var activeClause = onlyActive ? "AND is_active = 1" : "";
-
-        return await database.QuerySingleAsync($"SELECT TOP 1 * FROM users WHERE mobile_number = @mobileNumber {activeClause}", new { mobileNumber });
+        return await dbContext.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(user => user.Id == userId && user.DeletedAt == null);
     }
 
-    public async Task<Dictionary<string, object?>> CreateInactiveUserAsync(AuthUserCreate create)
+    public async Task<User?> FindUserByMobileAsync(string mobileNumber, bool onlyActive = false)
     {
-        var userId = await database.ExecuteScalarAsync<long>(
-            """
-            INSERT INTO users (display_name, mobile_number, [password], [role], preferred_language, is_active, created_at, updated_at)
-            OUTPUT INSERTED.id
-            VALUES (@DisplayName, @MobileNumber, @PasswordHash, 'addict', @PreferredLanguage, 0, SYSDATETIME(), SYSDATETIME())
-            """,
-            create);
+        var query = dbContext.Users
+            .AsNoTracking()
+            .Where(user => user.MobileNumber == mobileNumber && user.DeletedAt == null);
 
-        await CompleteRegistrationDetailsAsync(userId, create);
+        if (onlyActive)
+        {
+            query = query.Where(user => user.IsActive);
+        }
 
-        return (await database.UserAsync(userId))!;
+        return await query.FirstOrDefaultAsync();
+    }
+
+    public async Task<User> CreateInactiveUserAsync(AuthUserCreate create)
+    {
+        var now = DateTime.UtcNow;
+        var user = new User
+        {
+            DisplayName = create.DisplayName,
+            MobileNumber = create.MobileNumber,
+            Password = create.PasswordHash,
+            Role = "addict",
+            PreferredLanguage = create.PreferredLanguage,
+            IsActive = false,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        dbContext.Users.Add(user);
+        await dbContext.SaveChangesAsync();
+
+        await CompleteRegistrationDetailsAsync(user.Id, create);
+
+        return (await FindUserByIdAsync(user.Id))!;
     }
 
     public async Task<bool> HasAddictionProfileAsync(long userId)
     {
-        var row = await database.QuerySingleAsync("SELECT TOP 1 id FROM addiction_profiles WHERE user_id = @userId", new { userId });
-
-        return row is not null;
+        return await dbContext.AddictionProfiles.AnyAsync(profile => profile.UserId == userId);
     }
 
     public async Task CompleteRegistrationDetailsAsync(long userId, AuthUserCreate create)
     {
+        var now = DateTime.UtcNow;
+
         if (!await HasAddictionProfileAsync(userId))
         {
-            await database.ExecuteAsync(
-                """
-                INSERT INTO addiction_profiles (user_id, addiction_duration_id, education_level_id, had_prior_treatment, addiction_reason, days_clean, created_at, updated_at)
-                VALUES (@userId, @AddictionDurationId, @EducationLevelId, @HadPriorTreatment, @AddictionReason, @DaysClean, SYSDATETIME(), SYSDATETIME())
-                """,
-                new
-                {
-                    userId,
-                    create.AddictionDurationId,
-                    create.EducationLevelId,
-                    create.HadPriorTreatment,
-                    create.AddictionReason,
-                    create.DaysClean
-                });
+            dbContext.AddictionProfiles.Add(new AddictionProfile
+            {
+                UserId = userId,
+                AddictionDurationId = create.AddictionDurationId,
+                EducationLevelId = create.EducationLevelId,
+                HadPriorTreatment = create.HadPriorTreatment,
+                AddictionReason = create.AddictionReason,
+                DaysClean = create.DaysClean,
+                CreatedAt = now,
+                UpdatedAt = now
+            });
         }
 
-        foreach (var substanceId in create.SubstanceIds.Distinct())
+        var existingSubstanceIds = await dbContext.UserSubstances
+            .Where(substance => substance.UserId == userId)
+            .Select(substance => substance.SubstanceId)
+            .ToListAsync();
+
+        foreach (var substanceId in create.SubstanceIds.Distinct().Except(existingSubstanceIds))
         {
-            await database.ExecuteAsync(
-                """
-                IF NOT EXISTS (SELECT 1 FROM user_substances WHERE user_id = @userId AND substance_id = @substanceId)
-                BEGIN
-                    INSERT INTO user_substances (user_id, substance_id, created_at)
-                    VALUES (@userId, @substanceId, SYSDATETIME())
-                END
-                """,
-                new { userId, substanceId });
+            dbContext.UserSubstances.Add(new UserSubstance
+            {
+                UserId = userId,
+                SubstanceId = substanceId,
+                CreatedAt = now
+            });
         }
+
+        var existingTreatmentTypeIds = await dbContext.UserTreatmentTypes
+            .Where(treatmentType => treatmentType.UserId == userId)
+            .Select(treatmentType => treatmentType.LookupValueId)
+            .ToListAsync();
+
+        foreach (var treatmentTypeId in create.TreatmentTypeIds.Distinct().Except(existingTreatmentTypeIds))
+        {
+            dbContext.UserTreatmentTypes.Add(new UserTreatmentType
+            {
+                UserId = userId,
+                LookupValueId = treatmentTypeId
+            });
+        }
+
+        await dbContext.SaveChangesAsync();
     }
 
     public async Task ActivateUserAsync(long userId)
     {
-        await database.ExecuteAsync("UPDATE users SET is_active = 1, updated_at = SYSDATETIME() WHERE id = @userId", new { userId });
+        var user = await dbContext.Users.FirstOrDefaultAsync(user => user.Id == userId);
+        if (user is null)
+        {
+            return;
+        }
+
+        user.IsActive = true;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync();
     }
 
     public async Task RecordLoginAsync(long userId, string deviceId)
     {
-        await database.ExecuteAsync("UPDATE users SET active_device_id = @deviceId, updated_at = SYSDATETIME() WHERE id = @userId", new { userId, deviceId });
-        await database.ExecuteAsync(
-            "INSERT INTO device_sessions (user_id, device_id, device_info, event_type, sanctum_token_id, created_at) VALUES (@userId, @deviceId, NULL, 'login', NULL, SYSDATETIME())",
-            new { userId, deviceId });
+        var now = DateTime.UtcNow;
+        var user = await dbContext.Users.FirstOrDefaultAsync(user => user.Id == userId);
+        if (user is null)
+        {
+            return;
+        }
+
+        user.ActiveDeviceId = deviceId;
+        user.UpdatedAt = now;
+
+        dbContext.DeviceSessions.Add(new DeviceSession
+        {
+            UserId = userId,
+            DeviceId = deviceId,
+            EventType = "login",
+            CreatedAt = now
+        });
+
+        await dbContext.SaveChangesAsync();
+    }
+
+    public async Task ClearActiveDeviceAsync(long userId)
+    {
+        var user = await dbContext.Users.FirstOrDefaultAsync(user => user.Id == userId);
+        if (user is null)
+        {
+            return;
+        }
+
+        user.ActiveDeviceId = null;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync();
+    }
+
+    public async Task UpdatePasswordAsync(long userId, string passwordHash)
+    {
+        var user = await dbContext.Users.FirstOrDefaultAsync(user => user.Id == userId);
+        if (user is null)
+        {
+            return;
+        }
+
+        user.Password = passwordHash;
+        user.UpdatedAt = DateTime.UtcNow;
+
+        await dbContext.SaveChangesAsync();
     }
 
     public async Task DeactivateAccountAsync(long userId)
     {
-        await database.ExecuteAsync("UPDATE users SET fcm_token = NULL, active_device_id = NULL, is_active = 0, deleted_at = SYSDATETIME(), updated_at = SYSDATETIME() WHERE id = @userId", new { userId });
+        var user = await dbContext.Users.FirstOrDefaultAsync(user => user.Id == userId);
+        if (user is null)
+        {
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+        user.FcmToken = null;
+        user.ActiveDeviceId = null;
+        user.IsActive = false;
+        user.DeletedAt = now;
+        user.UpdatedAt = now;
+
+        await dbContext.SaveChangesAsync();
     }
 }

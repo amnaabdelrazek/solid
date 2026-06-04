@@ -1,5 +1,5 @@
 using Solid.Api.Common;
-using Solid.Api.Database;
+using Solid.Api.Database.Repositories;
 
 namespace Solid.Api.Features.Recommendations;
 
@@ -12,9 +12,9 @@ public static class RecommendationSlice
         return api;
     }
 
-    private static async Task<IResult> Index(IDatabase database)
+    private static async Task<IResult> Index(IRecommendationRepository recommendationRepository)
     {
-        var recommendations = await database.QueryAsync("SELECT * FROM recommendations WHERE is_active = 1 ORDER BY id");
+        var recommendations = await recommendationRepository.ActiveAsync();
 
         return ApiResponse.Ok(new { recommendations = recommendations.Select(RecommendationResource.From) });
     }

@@ -9,6 +9,7 @@ public static class RecommendationResource
         return new
         {
             id = recommendation.Id,
+            created_by_user_id = recommendation.CreatedByUserId,
             substance_category_id = recommendation.SubstanceCategoryId,
             type = recommendation.Type,
             name_ar = recommendation.NameAr,

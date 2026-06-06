@@ -13,6 +13,16 @@ public sealed class UserRepository(SolidDbContext dbContext) : IUserRepository
             .FirstOrDefaultAsync(user => user.Id == userId && user.DeletedAt == null);
     }
 
+    public async Task<User?> FindWithProfileAsync(long userId)
+    {
+        return await dbContext.Users
+            .AsNoTracking()
+            .Include(u => u.AddictionProfile)
+            .Include(u => u.UserSubstances)
+                .ThenInclude(us => us.Substance)
+            .FirstOrDefaultAsync(user => user.Id == userId && user.DeletedAt == null);
+    }
+
     public async Task UpdateProfileAsync(long userId, ProfileUpdate update)
     {
         var user = await dbContext.Users.FirstOrDefaultAsync(user => user.Id == userId && user.DeletedAt == null);
@@ -21,11 +31,12 @@ public sealed class UserRepository(SolidDbContext dbContext) : IUserRepository
             return;
         }
 
-        user.DisplayName = update.DisplayName ?? user.DisplayName;
-        user.Email = update.Email ?? user.Email;
-        user.MobileNumber = update.MobileNumber ?? user.MobileNumber;
-        user.Bio = update.Bio ?? user.Bio;
-        user.AvatarUrl = update.AvatarUrl ?? user.AvatarUrl;
+        // Only update if the new value is not null (preserve existing values)
+        if (update.DisplayName != null) user.DisplayName = update.DisplayName;
+        if (update.Email != null) user.Email = update.Email;
+        if (update.MobileNumber != null) user.MobileNumber = update.MobileNumber;
+        if (update.Bio != null) user.Bio = update.Bio;
+        if (update.AvatarUrl != null) user.AvatarUrl = update.AvatarUrl;
         user.UpdatedAt = DateTime.UtcNow;
 
         await dbContext.SaveChangesAsync();

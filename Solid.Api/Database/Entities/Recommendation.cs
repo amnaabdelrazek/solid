@@ -4,6 +4,8 @@ public sealed class Recommendation
 {
     public long Id { get; set; }
 
+    public long? CreatedByUserId { get; set; }
+
     public long? SubstanceCategoryId { get; set; }
 
     public string Type { get; set; } = string.Empty;
@@ -25,4 +27,6 @@ public sealed class Recommendation
     public DateTime? UpdatedAt { get; set; }
 
     public SubstanceCategory? SubstanceCategory { get; set; }
+
+    public User? CreatedByUser { get; set; }
 }

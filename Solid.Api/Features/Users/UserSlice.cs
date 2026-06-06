@@ -22,11 +22,11 @@ public static class UserSlice
 
     private static async Task<IResult> CurrentUser(IAuthContext auth, IUserRepository userRepository)
     {
-        var user = await userRepository.FindAsync(auth.UserId);
+        var user = await userRepository.FindWithProfileAsync(auth.UserId);
 
         return user is null
             ? ApiResponse.Fail("Not found.", StatusCodes.Status404NotFound)
-            : ApiResponse.Ok(UserResource.From(user));
+            : ApiResponse.Ok(UserFullResource.From(user));
     }
 
     private static async Task<IResult> Show(long userId, IUserRepository userRepository)
@@ -40,6 +40,25 @@ public static class UserSlice
 
     private static async Task<IResult> UpdateProfile(IAuthContext auth, [FromBody] ProfileRequest request, IUserRepository userRepository)
     {
+        // Validate email if provided
+        if (!string.IsNullOrWhiteSpace(request.email))
+        {
+            if (!ValidationHelper.IsValidEmail(request.email))
+                return ApiResponse.Fail("Invalid email format.", StatusCodes.Status422UnprocessableEntity);
+        }
+
+        // Validate mobile if provided
+        if (!string.IsNullOrWhiteSpace(request.mobile_number))
+        {
+            if (!PhoneNumberValidator.TryNormalize(request.mobile_number, out var normalized))
+                return ApiResponse.Fail(PhoneNumberValidator.Message, StatusCodes.Status422UnprocessableEntity);
+            request = request with { mobile_number = normalized };
+        }
+
+        // Validate display_name if provided
+        if (request.display_name != null && request.display_name.Trim().Length < 2)
+            return ApiResponse.Fail("Display name must be at least 2 characters.", StatusCodes.Status422UnprocessableEntity);
+
         await userRepository.UpdateProfileAsync(
             auth.UserId,
             new ProfileUpdate(request.display_name, request.email, request.mobile_number, request.bio, request.avatar_url));
@@ -72,17 +91,21 @@ public static class UserSlice
         [FromBody] CreateInstructorRequest request,
         IUserRepository userRepository)
     {
-        //if (!auth.IsAdmin())
-        //{
-        //    return ApiResponse.Fail("This action is unauthorized.", StatusCodes.Status403Forbidden);
-        //}
-
         if (string.IsNullOrWhiteSpace(request.display_name) ||
             string.IsNullOrWhiteSpace(request.mobile_number) ||
             string.IsNullOrWhiteSpace(request.password))
         {
             return ApiResponse.Fail("The given data was invalid.", StatusCodes.Status422UnprocessableEntity);
         }
+
+        if (request.display_name.Trim().Length < 2)
+            return ApiResponse.Fail("Display name must be at least 2 characters.", StatusCodes.Status422UnprocessableEntity);
+
+        if (request.password.Length < 8)
+            return ApiResponse.Fail("Password must be at least 8 characters.", StatusCodes.Status422UnprocessableEntity);
+
+        if (!string.IsNullOrWhiteSpace(request.email) && !ValidationHelper.IsValidEmail(request.email))
+            return ApiResponse.Fail("Invalid email format.", StatusCodes.Status422UnprocessableEntity);
 
         if (!PhoneNumberValidator.TryNormalize(request.mobile_number, out var normalizedMobileNumber))
         {
@@ -95,7 +118,7 @@ public static class UserSlice
         }
 
         var instructor = await userRepository.CreateInstructorAsync(new InstructorCreate(
-            request.display_name,
+            request.display_name.Trim(),
             normalizedMobileNumber,
             BCrypt.Net.BCrypt.HashPassword(request.password, 12),
             request.email,

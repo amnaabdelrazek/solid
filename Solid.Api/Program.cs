@@ -1,4 +1,3 @@
-using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -17,6 +16,9 @@ using Solid.Api.Features.Settings;
 using Solid.Api.Features.Users;
 using Solid.Api.Infrastructure.Auth;
 using Solid.Api.Infrastructure.Sms;
+using Solid.Api.Seeds;
+using System.Text;
+using static Twilio.Rest.Intelligence.V3.ConfigurationResource;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -131,6 +133,14 @@ builder.Services.AddAuthorization();
 #endregion
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext =
+        scope.ServiceProvider.GetRequiredService<SolidDbContext>();
+
+    await DatabaseSeeder.SeedAsync(dbContext);
+}
 
 #region Swagger Middleware
 if (app.Environment.IsDevelopment())

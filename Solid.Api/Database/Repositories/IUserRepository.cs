@@ -6,6 +6,8 @@ public interface IUserRepository
 {
     Task<User?> FindAsync(long userId);
 
+    Task<User?> FindWithProfileAsync(long userId);
+
     Task UpdateProfileAsync(long userId, ProfileUpdate update);
 
     Task<IReadOnlyList<User>> InstructorsAsync();

@@ -39,6 +39,12 @@ public static class AuthSlice
             return ApiResponse.Fail("The given data was invalid.", StatusCodes.Status422UnprocessableEntity);
         }
 
+        if (request.display_name.Trim().Length < 2)
+            return ApiResponse.Fail("Display name must be at least 2 characters.", StatusCodes.Status422UnprocessableEntity);
+
+        if (request.password.Length < 8)
+            return ApiResponse.Fail("Password must be at least 8 characters.", StatusCodes.Status422UnprocessableEntity);
+
         if (!PhoneNumberValidator.TryNormalize(request.mobile_number, out var normalizedMobileNumber))
         {
             return ApiResponse.Fail(PhoneNumberValidator.Message, StatusCodes.Status422UnprocessableEntity);
@@ -104,6 +110,9 @@ public static class AuthSlice
             return ApiResponse.Fail("Invalid OTP provided.", StatusCodes.Status422UnprocessableEntity);
         }
 
+        if (string.IsNullOrWhiteSpace(request.otp))
+            return ApiResponse.Fail("OTP is required.", StatusCodes.Status422UnprocessableEntity);
+
         try
         {
             await authService.VerifyAsync(token, request.otp);
@@ -118,6 +127,9 @@ public static class AuthSlice
 
     private static async Task<IResult> Login([FromBody] LoginRequest request, IAuthService authService)
     {
+        if (string.IsNullOrWhiteSpace(request.mobile_number) || string.IsNullOrWhiteSpace(request.password))
+            return ApiResponse.Fail("Mobile number and password are required.", StatusCodes.Status422UnprocessableEntity);
+
         if (!PhoneNumberValidator.TryNormalize(request.mobile_number, out var normalizedMobileNumber))
         {
             return ApiResponse.Fail(PhoneNumberValidator.Message, StatusCodes.Status422UnprocessableEntity);
@@ -136,6 +148,9 @@ public static class AuthSlice
 
     private static async Task<IResult> ForgotPassword([FromBody] ForgotPasswordRequest request, IAuthService authService)
     {
+        if (string.IsNullOrWhiteSpace(request.mobile_number))
+            return ApiResponse.Fail("Mobile number is required.", StatusCodes.Status422UnprocessableEntity);
+
         if (!PhoneNumberValidator.TryNormalize(request.mobile_number, out var normalizedMobileNumber))
         {
             return ApiResponse.Fail(PhoneNumberValidator.Message, StatusCodes.Status422UnprocessableEntity);
@@ -163,6 +178,9 @@ public static class AuthSlice
 
     private static async Task<IResult> VerifyForgotOtp([FromBody] VerifyForgotOtpRequest request, IAuthService authService)
     {
+        if (string.IsNullOrWhiteSpace(request.token) || string.IsNullOrWhiteSpace(request.otp))
+            return ApiResponse.Fail("Token and OTP are required.", StatusCodes.Status422UnprocessableEntity);
+
         var resetToken = await authService.VerifyForgotOtpAsync(request);
         if (resetToken is null)
         {
@@ -174,6 +192,12 @@ public static class AuthSlice
 
     private static async Task<IResult> ResetPassword([FromBody] ResetPasswordRequest request, IAuthService authService)
     {
+        if (string.IsNullOrWhiteSpace(request.reset_token) || string.IsNullOrWhiteSpace(request.password))
+            return ApiResponse.Fail("Reset token and password are required.", StatusCodes.Status422UnprocessableEntity);
+
+        if (request.password.Length < 8)
+            return ApiResponse.Fail("Password must be at least 8 characters.", StatusCodes.Status422UnprocessableEntity);
+
         if (!await authService.ResetPasswordAsync(request))
         {
             return ApiResponse.Fail("OTP has expired. Please request a new one.", StatusCodes.Status422UnprocessableEntity);

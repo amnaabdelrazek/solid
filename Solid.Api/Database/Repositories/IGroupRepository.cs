@@ -10,7 +10,7 @@ public interface IGroupRepository
 
     Task<bool> HasActiveMembershipAsync(long userId);
 
-    Task<Group> FindOrCreateOpenAsync();
+    Task<Group?> FindOrCreateForUserSubstanceAsync(long userId);
 
     Task AddMemberAsync(long groupId, long userId);
 }

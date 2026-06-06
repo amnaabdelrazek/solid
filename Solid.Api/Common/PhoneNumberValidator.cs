@@ -58,6 +58,24 @@ public static partial class PhoneNumberValidator
         return false;
     }
 
+    public static IReadOnlyList<string> SearchCandidates(string phoneNumber)
+    {
+        var candidates = new List<string> { phoneNumber };
+
+        if (TryNormalize(phoneNumber, out var normalizedPhoneNumber))
+        {
+            candidates.Add(normalizedPhoneNumber);
+
+            if (normalizedPhoneNumber.StartsWith("+20", StringComparison.Ordinal) &&
+                normalizedPhoneNumber.Length == 13)
+            {
+                candidates.Add($"0{normalizedPhoneNumber[3..]}");
+            }
+        }
+
+        return candidates.Distinct().ToArray();
+    }
+
     [GeneratedRegex("^\\+[1-9]\\d{7,14}$")]
     private static partial Regex E164Regex();
 

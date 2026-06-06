@@ -15,8 +15,13 @@ public static class GroupSlice
         return api;
     }
 
-    private static async Task<IResult> Index(IGroupRepository groupRepository)
+    private static async Task<IResult> Index(IAuthContext auth, IGroupRepository groupRepository)
     {
+        if (!auth.IsAdminOrInstructor())
+        {
+            return ApiResponse.Fail("This action is unauthorized.", StatusCodes.Status403Forbidden);
+        }
+
         var groups = await groupRepository.ListAsync();
 
         return ApiResponse.Ok(new { groups = groups.Select(GroupResource.From) });
@@ -38,7 +43,12 @@ public static class GroupSlice
             return ApiResponse.Fail("You are already subscribed to a group.", StatusCodes.Status422UnprocessableEntity);
         }
 
-        var group = await groupRepository.FindOrCreateOpenAsync();
+        var group = await groupRepository.FindOrCreateForUserSubstanceAsync(auth.UserId);
+        if (group is null)
+        {
+            return ApiResponse.Fail("You must choose a substance before joining a group.", StatusCodes.Status422UnprocessableEntity);
+        }
+
         await groupRepository.AddMemberAsync(group.Id, auth.UserId);
 
         return ApiResponse.Ok(new { group = GroupResource.From(group) }, "Joined group successfully. Waiting for other members to start sessions.");

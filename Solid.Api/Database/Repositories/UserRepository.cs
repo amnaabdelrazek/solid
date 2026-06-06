@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Solid.Api.Common;
 using Solid.Api.Database.Entities;
 
 namespace Solid.Api.Database.Repositories;
@@ -37,5 +38,47 @@ public sealed class UserRepository(SolidDbContext dbContext) : IUserRepository
             .Where(user => user.Role == "instructor" && user.DeletedAt == null)
             .OrderBy(user => user.Id)
             .ToListAsync();
+    }
+
+    public async Task<User?> FindInstructorAsync(long userId)
+    {
+        return await dbContext.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(user => user.Id == userId && user.Role == "instructor" && user.DeletedAt == null);
+    }
+
+    public async Task<User?> FindByMobileAsync(string mobileNumber)
+    {
+        var candidates = PhoneNumberValidator.SearchCandidates(mobileNumber);
+
+        return await dbContext.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(user => user.MobileNumber != null && candidates.Contains(user.MobileNumber) && user.DeletedAt == null);
+    }
+
+    public async Task<User> CreateInstructorAsync(InstructorCreate create)
+    {
+        var now = DateTime.UtcNow;
+        var instructor = new User
+        {
+            DisplayName = create.DisplayName,
+            MobileNumber = create.MobileNumber,
+            Password = create.PasswordHash,
+            Email = create.Email,
+            Role = "instructor",
+            PreferredLanguage = create.PreferredLanguage,
+            Bio = create.Bio,
+            AvatarUrl = create.AvatarUrl,
+            Experience = create.Experience,
+            Quote = create.Quote,
+            IsActive = true,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        dbContext.Users.Add(instructor);
+        await dbContext.SaveChangesAsync();
+
+        return instructor;
     }
 }

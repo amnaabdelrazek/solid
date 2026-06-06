@@ -9,6 +9,7 @@ public interface ILookupRepository
     Task<IReadOnlyList<Substance>> SubstancesAsync(long categoryId);
 
     Task<LookupType?> LookupTypeAsync(string type);
+    Task<IReadOnlyList<Substance>> AllSubstancesAsync();
 
     Task<IReadOnlyList<LookupValue>> LookupValuesAsync(long lookupTypeId);
 

@@ -69,6 +69,7 @@ builder.Services.AddDbContext<SolidDbContext>(options =>
 #region DI
 builder.Services.AddScoped<IAuthContext, JwtAuthContext>();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
+builder.Services.AddScoped<IJwtTokenRevocationService, JwtTokenRevocationService>();
 builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 builder.Services.AddScoped<ICacheRepository, CacheRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -101,6 +102,28 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidAudience = builder.Configuration["Jwt:Audience"],
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromMinutes(1)
+        };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var authorization = context.HttpContext.Request.Headers.Authorization.FirstOrDefault();
+                var token = authorization?.Replace("Bearer ", "", StringComparison.OrdinalIgnoreCase);
+
+                if (string.IsNullOrWhiteSpace(token))
+                {
+                    context.Fail("Token is missing.");
+
+                    return;
+                }
+
+                var revocationService = context.HttpContext.RequestServices.GetRequiredService<IJwtTokenRevocationService>();
+                if (await revocationService.IsRevokedAsync(token))
+                {
+                    context.Fail("Token has been revoked.");
+                }
+            }
         };
     });
 

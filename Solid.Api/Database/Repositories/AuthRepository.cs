@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Solid.Api.Common;
 using Solid.Api.Database.Entities;
 
 namespace Solid.Api.Database.Repositories;
@@ -14,9 +15,10 @@ public sealed class AuthRepository(SolidDbContext dbContext) : IAuthRepository
 
     public async Task<User?> FindUserByMobileAsync(string mobileNumber, bool onlyActive = false)
     {
+        var candidates = PhoneNumberValidator.SearchCandidates(mobileNumber);
         var query = dbContext.Users
             .AsNoTracking()
-            .Where(user => user.MobileNumber == mobileNumber && user.DeletedAt == null);
+            .Where(user => user.MobileNumber != null && candidates.Contains(user.MobileNumber) && user.DeletedAt == null);
 
         if (onlyActive)
         {

@@ -182,9 +182,16 @@ public static class AuthSlice
         return ApiResponse.Ok(message: "Password has been reset successfully.");
     }
 
-    private static async Task<IResult> Logout(IAuthContext auth, IAuthRepository authRepository)
+    private static async Task<IResult> Logout(
+        IAuthContext auth,
+        HttpRequest request,
+        IAuthRepository authRepository,
+        IJwtTokenRevocationService tokenRevocationService)
     {
+        var token = request.Headers.Authorization.FirstOrDefault()?.Replace("Bearer ", "", StringComparison.OrdinalIgnoreCase);
+
         await authRepository.ClearActiveDeviceAsync(auth.UserId);
+        await tokenRevocationService.RevokeAsync(token ?? string.Empty);
 
         return ApiResponse.Ok(message: "Logged out successfully");
     }

@@ -4,13 +4,17 @@ namespace Solid.Api.Database.Repositories;
 
 public interface ISessionRepository
 {
-    Task<IReadOnlyList<TherapySession>> ListForUserAsync(long userId);
+    Task<IReadOnlyList<TherapySession>> ListForUserAsync(long userId, string? role);
 
     Task<IReadOnlyList<TherapySession>> PaidForUserAsync(long userId);
 
-    Task<TherapySession?> FindAsync(long sessionId);
+    Task<TherapySession?> FindAsync(long sessionId, long userId, string? role);
 
-    Task RecordJoinAsync(long sessionId, long userId);
+    Task<TherapySession?> FindAnyAsync(long sessionId);
+
+    Task<CreateSessionResult> CreateAsync(SessionCreate create);
+
+    Task<JoinSessionResult> RecordJoinAsync(long sessionId, long userId);
 
     Task LeaveAsync(long sessionId, long userId);
 
@@ -20,3 +24,18 @@ public interface ISessionRepository
 
     Task<SessionAttendance?> SaveFeedbackAsync(long sessionId, long userId, int rating, string? comment);
 }
+
+public sealed record SessionCreate(
+    long GroupId,
+    long InstructorId,
+    int? SessionNumber,
+    string? Title,
+    string SessionType,
+    DateTime ScheduledAt,
+    byte DurationMinutes,
+    int? MaxParticipants,
+    object? Metadata);
+
+public sealed record CreateSessionResult(TherapySession? Session, string? Error, int StatusCode);
+
+public sealed record JoinSessionResult(bool Success, TherapySession? Session, string? Error, int StatusCode);

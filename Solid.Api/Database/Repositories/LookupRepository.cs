@@ -48,6 +48,13 @@ public sealed class LookupRepository(SolidDbContext dbContext) : ILookupReposito
         return await dbContext.LookupValues.CountAsync(value => ids.Contains(value.Id));
     }
 
+    public async Task<IReadOnlyList<Substance>> AllSubstancesAsync()
+    {
+        return await dbContext.Substances
+            .AsNoTracking()
+            .Where(x => x.IsActive)
+            .ToListAsync();
+    }
     public async Task<int> CountSubstancesAsync(IEnumerable<long> substanceIds)
     {
         var ids = substanceIds.Distinct().ToArray();

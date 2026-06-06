@@ -45,9 +45,15 @@ public static class SettingsSlice
             : ApiResponse.Ok(new { setting = new { key, value, type = "string" } });
     }
 
-    private static async Task<IResult> Update(string key, [FromBody] SettingRequest request, ISettingsRepository settingsRepository)
+    private static async Task<IResult> Update(string key, IAuthContext auth, [FromBody] SettingRequest request, ISettingsRepository settingsRepository)
     {
-        await settingsRepository.SetAsync("general", key, request.value);
+        if (!auth.IsAdminOrInstructor())
+        {
+            return ApiResponse.Fail("This action is unauthorized.", StatusCodes.Status403Forbidden);
+        }
+
+        var group = IsContentSetting(key) ? "content" : "general";
+        await settingsRepository.SetAsync(group, key, request.value);
 
         return ApiResponse.Ok(message: "Setting updated successfully.");
     }
@@ -73,6 +79,12 @@ public static class SettingsSlice
     private static object Setting(string? value, string type)
     {
         return new { value, type };
+    }
+
+    private static bool IsContentSetting(string key)
+    {
+        return string.Equals(key, "privacy_policy", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(key, "terms_and_conditions", StringComparison.OrdinalIgnoreCase);
     }
 }
 

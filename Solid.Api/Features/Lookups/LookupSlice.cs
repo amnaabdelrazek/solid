@@ -18,24 +18,25 @@ public static class LookupSlice
     {
         var locale = RequestCulture.Locale(request);
         var categories = await lookupRepository.SubstanceCategoriesAsync();
+        var allSubstances = await lookupRepository.AllSubstancesAsync();
+
+        var result = categories.Select(category => new
+        {
+            id = category.Id,
+            label = TranslatedName(category, locale),
+
+            substances = allSubstances
+        .Where(x => x.SubstanceCategoryId == category.Id)
+        .Select(x => new
+        {
+            id = x.Id,
+            label = TranslatedName(x, locale)
+        })
+        });
 
         return ApiResponse.Ok(new
         {
-            categories = await Task.WhenAll(categories.Select(async category =>
-            {
-                var substances = await lookupRepository.SubstancesAsync(category.Id);
-
-                return new
-                {
-                    id = category.Id,
-                    label = TranslatedName(category, locale),
-                    substances = substances.Select(substance => new
-                    {
-                        id = substance.Id,
-                        label = TranslatedName(substance, locale)
-                    })
-                };
-            }))
+            categories = result
         });
     }
 

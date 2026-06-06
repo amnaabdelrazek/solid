@@ -24,7 +24,7 @@ public static class PaymentSlice
         IPaymentRepository paymentRepository,
         ISessionRepository sessionRepository)
     {
-        if (await sessionRepository.FindAsync(sessionId) is null)
+        if (await sessionRepository.FindAnyAsync(sessionId) is null)
         {
             return ApiResponse.Fail("Session not found.", StatusCodes.Status404NotFound);
         }

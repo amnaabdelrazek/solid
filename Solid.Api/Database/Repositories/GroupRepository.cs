@@ -9,6 +9,8 @@ public sealed class GroupRepository(SolidDbContext dbContext) : IGroupRepository
     {
         return await dbContext.Groups
             .AsNoTracking()
+            .Include(group => group.Members)
+            .Include(group => group.SubstanceCategory)
             .Where(group => group.DeletedAt == null)
             .OrderByDescending(group => group.Id)
             .ToListAsync();
@@ -18,6 +20,8 @@ public sealed class GroupRepository(SolidDbContext dbContext) : IGroupRepository
     {
         return await dbContext.GroupMembers
             .AsNoTracking()
+            .Include(member => member.Group.Members)
+            .Include(member => member.Group.SubstanceCategory)
             .Where(member => member.UserId == userId && member.IsActive && member.Group.DeletedAt == null)
             .OrderByDescending(member => member.JoinedAt)
             .Select(member => member.Group)
@@ -29,10 +33,28 @@ public sealed class GroupRepository(SolidDbContext dbContext) : IGroupRepository
         return await dbContext.GroupMembers.AnyAsync(member => member.UserId == userId && member.IsActive);
     }
 
-    public async Task<Group> FindOrCreateOpenAsync()
+    public async Task<Group?> FindOrCreateForUserSubstanceAsync(long userId)
     {
+        var substanceCategory = await dbContext.UserSubstances
+            .AsNoTracking()
+            .Where(userSubstance => userSubstance.UserId == userId)
+            .OrderBy(userSubstance => userSubstance.Id)
+            .Select(userSubstance => userSubstance.Substance.SubstanceCategory)
+            .FirstOrDefaultAsync();
+
+        if (substanceCategory is null)
+        {
+            return null;
+        }
+
         var group = await dbContext.Groups
-            .Where(group => group.Status == "forming" && group.DeletedAt == null)
+            .Include(group => group.Members)
+            .Include(group => group.SubstanceCategory)
+            .Where(group =>
+                group.Status == "forming" &&
+                group.SubstanceCategoryId == substanceCategory.Id &&
+                group.DeletedAt == null)
+            .Where(group => group.Members.Count(member => member.IsActive) < group.MaxMembers)
             .OrderBy(group => group.Id)
             .FirstOrDefaultAsync();
 
@@ -41,20 +63,24 @@ public sealed class GroupRepository(SolidDbContext dbContext) : IGroupRepository
             return group;
         }
 
+        var now = DateTime.UtcNow;
         group = new Group
         {
             GroupType = "mixed",
             Status = "forming",
-            NameAr = "مجموعة جديدة",
-            NameEn = "New Group",
+            SubstanceCategoryId = substanceCategory.Id,
+            NameAr = substanceCategory.NameAr,
+            NameEn = $"{substanceCategory.NameEn} Group",
             MinMembers = 7,
             MaxMembers = 15,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
+            CreatedAt = now,
+            UpdatedAt = now
         };
 
         dbContext.Groups.Add(group);
         await dbContext.SaveChangesAsync();
+
+        group.SubstanceCategory = substanceCategory;
 
         return group;
     }

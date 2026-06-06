@@ -17,6 +17,7 @@ public sealed class JwtTokenService(IConfiguration configuration) : IJwtTokenSer
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, userId.ToString()),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
             new("purpose", purpose)
         };
 

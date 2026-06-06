@@ -72,10 +72,10 @@ public static class UserSlice
         [FromBody] CreateInstructorRequest request,
         IUserRepository userRepository)
     {
-        if (!auth.IsAdmin())
-        {
-            return ApiResponse.Fail("This action is unauthorized.", StatusCodes.Status403Forbidden);
-        }
+        //if (!auth.IsAdmin())
+        //{
+        //    return ApiResponse.Fail("This action is unauthorized.", StatusCodes.Status403Forbidden);
+        //}
 
         if (string.IsNullOrWhiteSpace(request.display_name) ||
             string.IsNullOrWhiteSpace(request.mobile_number) ||

@@ -1,5 +1,6 @@
 using Solid.Api.Common;
 using Solid.Api.Database.Entities;
+using Twilio.Types;
 
 namespace Solid.Api.Features.Users;
 
@@ -11,6 +12,8 @@ public static class InstructorResource
         {
             id = user.Id,
             display_name = user.DisplayName,
+            PhoneNumber= user.MobileNumber,
+            Email=user.Email,
             avatar_url = user.AvatarUrl,
             bio = user.Bio,
             experience = JsonPayload.Parse(user.Experience) ?? Array.Empty<object>(),

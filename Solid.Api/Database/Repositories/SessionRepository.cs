@@ -26,7 +26,6 @@ public sealed class SessionRepository(SolidDbContext dbContext) : ISessionReposi
         }
 
         var sessions = await query
-            .Where(session => session.Group.Members.Any(member => member.UserId == userId && member.IsActive))
             .OrderBy(session => session.ScheduledAt)
             .ToListAsync();
 
@@ -252,7 +251,7 @@ public sealed class SessionRepository(SolidDbContext dbContext) : ISessionReposi
             .Include(session => session.Group.Members)
             .Include(session => session.Attendances)
             .Where(session => session.DeletedAt == null)
-            .Where(session => session.Status != "finished");
+            /*.Where(session => session.Status != "finished")*/;
     }
 
     private static bool IsFull(TherapySession session)

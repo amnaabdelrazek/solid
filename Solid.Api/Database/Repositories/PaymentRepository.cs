@@ -66,4 +66,26 @@ public sealed class PaymentRepository(SolidDbContext dbContext) : IPaymentReposi
             .OrderBy(paymentMethod => paymentMethod.Id)
             .ToListAsync();
     }
+    // في PaymentRepository
+    public async Task UpdateGatewayTransactionAsync(long paymentId, string transactionId, string gateway)
+    {
+        var payment = await dbContext.Payments.FindAsync(paymentId);
+        if (payment is null) return;
+
+        payment.GatewayTransactionId = transactionId;
+        payment.Gateway = gateway;
+        payment.UpdatedAt = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync();
+    }
+
+    public async Task MarkAsPaidAsync(long paymentId, string transactionId)
+    {
+        var payment = await dbContext.Payments.FindAsync(paymentId);
+        if (payment is null) return;
+
+        payment.Status = "paid";
+        payment.PaidAt = DateTime.UtcNow;
+        payment.UpdatedAt = DateTime.UtcNow;
+        await dbContext.SaveChangesAsync();
+    }
 }

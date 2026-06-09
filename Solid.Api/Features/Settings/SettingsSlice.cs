@@ -47,10 +47,10 @@ public static class SettingsSlice
 
     private static async Task<IResult> Update(string key, IAuthContext auth, [FromBody] SettingRequest request, ISettingsRepository settingsRepository)
     {
-        if (!auth.IsAdminOrInstructor())
-        {
-            return ApiResponse.Fail("This action is unauthorized.", StatusCodes.Status403Forbidden);
-        }
+        //if (!auth.IsAdminOrInstructor())
+        //{
+        //    return ApiResponse.Fail("This action is unauthorized.", StatusCodes.Status403Forbidden);
+        //}
 
         var group = IsContentSetting(key) ? "content" : "general";
         await settingsRepository.SetAsync(group, key, request.value);

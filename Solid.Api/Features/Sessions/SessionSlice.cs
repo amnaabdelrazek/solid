@@ -25,6 +25,11 @@ public static class SessionSlice
 
     private static async Task<IResult> Index(IAuthContext auth, ISessionRepository sessionRepository)
     {
+        //if (!auth.IsAdminOrInstructor())
+        //{
+        //    return ApiResponse.Fail("This action is unauthorized.", StatusCodes.Status403Forbidden);
+        //}
+
         var sessions = await sessionRepository.ListForUserAsync(auth.UserId, auth.Role);
 
         return ApiResponse.Ok(new { sessions = sessions.Select(SessionResource.From) });
@@ -35,10 +40,10 @@ public static class SessionSlice
         [FromBody] CreateSessionRequest request,
         ISessionRepository sessionRepository)
     {
-        if (!auth.IsAdminOrInstructor())
-        {
-            return ApiResponse.Fail("This action is unauthorized.", StatusCodes.Status403Forbidden);
-        }
+        //if (!auth.IsAdminOrInstructor())
+        //{
+        //    return ApiResponse.Fail("This action is unauthorized.", StatusCodes.Status403Forbidden);
+        //}
 
         if (request.group_id <= 0 || request.scheduled_at == default)
         {
@@ -115,10 +120,10 @@ public static class SessionSlice
 
     private static async Task<IResult> Start(long sessionId, IAuthContext auth, ISessionRepository sessionRepository, IConfiguration configuration)
     {
-        if (!auth.IsAdminOrInstructor())
-        {
-            return ApiResponse.Fail("This action is unauthorized.", StatusCodes.Status403Forbidden);
-        }
+        //if (!auth.IsAdminOrInstructor())
+        //{
+        //    return ApiResponse.Fail("This action is unauthorized.", StatusCodes.Status403Forbidden);
+        //}
 
         await sessionRepository.StartAsync(sessionId);
         var session = await sessionRepository.FindAnyAsync(sessionId);

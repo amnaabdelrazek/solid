@@ -11,6 +11,9 @@ public interface IPaymentRepository
     Task<PaymentMethod> CreatePaymentMethodAsync(long userId, PaymentMethodCreate create);
 
     Task<IReadOnlyList<PaymentMethod>> PaymentMethodsAsync(long userId);
+    // في الـ interface
+    Task UpdateGatewayTransactionAsync(long paymentId, string transactionId, string gateway);
+    Task MarkAsPaidAsync(long paymentId, string transactionId);
 }
 
 public sealed record PaymentMethodCreate(string CardHolder, string CardNumber, string Expiry, bool IsDefault, string? GatewayToken);

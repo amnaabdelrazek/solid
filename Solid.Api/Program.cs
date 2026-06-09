@@ -17,10 +17,11 @@ using Solid.Api.Features.Users;
 using Solid.Api.Infrastructure.Auth;
 using Solid.Api.Infrastructure.Sms;
 using Solid.Api.Seeds;
+using Stripe;
 using System.Text;
-using static Twilio.Rest.Intelligence.V3.ConfigurationResource;
 
 var builder = WebApplication.CreateBuilder(args);
+
 
 #region Swagger
 builder.Services.AddEndpointsApiExplorer();
@@ -67,6 +68,9 @@ else
 }
 builder.Services.AddDbContext<SolidDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+StripeConfiguration.ApiKey =
+    builder.Configuration["Stripe:SecretKey"];
 
 #region DI
 builder.Services.AddScoped<IAuthContext, JwtAuthContext>();

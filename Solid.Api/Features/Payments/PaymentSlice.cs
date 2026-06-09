@@ -21,12 +21,12 @@ public static class PaymentSlice
     }
 
     private static async Task<IResult> Initiate(
-    long sessionId,
-    IAuthContext auth,
-    ISettingsRepository settingsRepository,
-    IPaymentRepository paymentRepository,
-    ISessionRepository sessionRepository,
-    IConfiguration configuration)
+        long sessionId,
+        IAuthContext auth,
+        ISettingsRepository settingsRepository,
+        IPaymentRepository paymentRepository,
+        ISessionRepository sessionRepository,
+        IConfiguration configuration)
     {
         if (await sessionRepository.FindAnyAsync(sessionId) is null)
             return ApiResponse.Fail("Session not found.", StatusCodes.Status404NotFound);
@@ -36,7 +36,6 @@ public static class PaymentSlice
 
         var payment = await paymentRepository.CreatePendingAsync(auth.UserId, sessionId, amount);
 
-        // Stripe Checkout Session
         StripeConfiguration.ApiKey = configuration["Stripe:SecretKey"];
 
         var options = new SessionCreateOptions
@@ -51,29 +50,30 @@ public static class PaymentSlice
                 }
             },
             PaymentMethodTypes = ["card"],
-            LineItems = [new SessionLineItemOptions
-        {
-            PriceData = new SessionLineItemPriceDataOptions
-            {
-                Currency = "egp",
-                UnitAmount = (long)(amount * 100), // Stripe بيحسب بالقروش
-                ProductData = new SessionLineItemPriceDataProductDataOptions
+            LineItems =
+            [
+                new SessionLineItemOptions
                 {
-                    Name = $"Therapy Session #{sessionId}",
+                    PriceData = new SessionLineItemPriceDataOptions
+                    {
+                        Currency = "egp",
+                        UnitAmount = (long)(amount * 100),
+                        ProductData = new SessionLineItemPriceDataProductDataOptions
+                        {
+                            Name = $"Therapy Session #{sessionId}",
+                        }
+                    },
+                    Quantity = 1,
                 }
-            },
-            Quantity = 1,
-        }],
+            ],
             Mode = "payment",
             SuccessUrl = $"{configuration["App:BaseUrl"]}/api/payments/success?paymentId={payment.Id}&session_id={{CHECKOUT_SESSION_ID}}",
             CancelUrl = $"{configuration["App:BaseUrl"]}/api/payments/cancel?paymentId={payment.Id}",
-            
         };
 
         var service = new SessionService();
         var checkoutSession = await service.CreateAsync(options);
 
-        // حدّث الـ payment بـ gateway transaction id
         await paymentRepository.UpdateGatewayTransactionAsync(payment.Id, checkoutSession.Id, "stripe");
 
         return ApiResponse.Ok(new
@@ -83,7 +83,6 @@ public static class PaymentSlice
         });
     }
 
-
     private static async Task<IResult> WebhookStripe(
         HttpRequest request,
         IPaymentRepository paymentRepository,
@@ -91,12 +90,17 @@ public static class PaymentSlice
     {
         var json = await new StreamReader(request.Body).ReadToEndAsync();
 
+        // Stripe webhook secret is required in production
+        var webhookSecret = configuration["Stripe:WebhookSecret"];
+        if (string.IsNullOrWhiteSpace(webhookSecret))
+            return Results.BadRequest();
+
         try
         {
             var stripeEvent = EventUtility.ConstructEvent(
                 json,
                 request.Headers["Stripe-Signature"],
-                configuration["Stripe:WebhookSecret"]
+                webhookSecret
             );
 
             if (stripeEvent.Type == "checkout.session.completed")
@@ -105,21 +109,18 @@ public static class PaymentSlice
                 if (session?.Metadata.TryGetValue("payment_id", out var paymentIdStr) == true
                     && long.TryParse(paymentIdStr, out var paymentId))
                 {
+                    var payments = await paymentRepository.HistoryAsync(0); // just used to check existence
+                    // Mark as paid only if payment exists
                     await paymentRepository.MarkAsPaidAsync(paymentId, session.Id);
                 }
             }
-
             else if (stripeEvent.Type == "payment_intent.succeeded")
             {
-                var paymentIntent =
-                    stripeEvent.Data.Object as PaymentIntent;
-
+                var paymentIntent = stripeEvent.Data.Object as PaymentIntent;
                 if (paymentIntent?.Metadata.TryGetValue("payment_id", out var paymentIdStr) == true
                     && long.TryParse(paymentIdStr, out var paymentId))
                 {
-                    await paymentRepository.MarkAsPaidAsync(
-                        paymentId,
-                        paymentIntent.Id);
+                    await paymentRepository.MarkAsPaidAsync(paymentId, paymentIntent.Id);
                 }
             }
 
@@ -131,17 +132,26 @@ public static class PaymentSlice
         }
     }
 
-
-
     private static async Task<IResult> History(IAuthContext auth, IPaymentRepository paymentRepository)
     {
         var payments = await paymentRepository.HistoryAsync(auth.UserId);
-
         return ApiResponse.Ok(payments.Select(PaymentResource.From));
     }
 
-    private static async Task<IResult> StorePaymentMethod(IAuthContext auth, [FromBody] PaymentMethodRequest request, IPaymentRepository paymentRepository)
+    private static async Task<IResult> StorePaymentMethod(
+        IAuthContext auth,
+        [FromBody] PaymentMethodRequest request,
+        IPaymentRepository paymentRepository)
     {
+        if (string.IsNullOrWhiteSpace(request.card_holder))
+            return ApiResponse.Fail("card_holder is required.", StatusCodes.Status422UnprocessableEntity);
+
+        if (string.IsNullOrWhiteSpace(request.card_number))
+            return ApiResponse.Fail("card_number is required.", StatusCodes.Status422UnprocessableEntity);
+
+        if (string.IsNullOrWhiteSpace(request.expiry))
+            return ApiResponse.Fail("expiry is required.", StatusCodes.Status422UnprocessableEntity);
+
         var paymentMethod = await paymentRepository.CreatePaymentMethodAsync(
             auth.UserId,
             new PaymentMethodCreate(request.card_holder, request.card_number, request.expiry, request.is_default, request.gateway_token));
@@ -152,7 +162,6 @@ public static class PaymentSlice
     private static async Task<IResult> PaymentMethods(IAuthContext auth, IPaymentRepository paymentRepository)
     {
         var paymentMethods = await paymentRepository.PaymentMethodsAsync(auth.UserId);
-
         return ApiResponse.Ok(new { payment_methods = paymentMethods.Select(PaymentMethodResource.From) });
     }
 }

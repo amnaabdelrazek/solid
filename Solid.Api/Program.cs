@@ -15,13 +15,13 @@ using Solid.Api.Features.Sessions;
 using Solid.Api.Features.Settings;
 using Solid.Api.Features.Users;
 using Solid.Api.Infrastructure.Auth;
+using Solid.Api.Infrastructure.Jitsi;
 using Solid.Api.Infrastructure.Sms;
 using Solid.Api.Seeds;
 using Stripe;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
-
 
 #region Swagger
 builder.Services.AddEndpointsApiExplorer();
@@ -58,19 +58,19 @@ builder.Services.AddSwaggerGen(options =>
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSignalR();
+
+// SMS provider
 if (builder.Configuration["Sms:Provider"]?.Equals("Twilio", StringComparison.OrdinalIgnoreCase) == true)
-{
     builder.Services.AddScoped<ISmsSender, TwilioVerifySender>();
-}
 else
-{
     builder.Services.AddScoped<ISmsSender, LocalOtpSender>();
-}
+
+// Database
 builder.Services.AddDbContext<SolidDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-StripeConfiguration.ApiKey =
-    builder.Configuration["Stripe:SecretKey"];
+// Stripe global config
+StripeConfiguration.ApiKey = builder.Configuration["Stripe:SecretKey"];
 
 #region DI
 builder.Services.AddScoped<IAuthContext, JwtAuthContext>();
@@ -87,6 +87,9 @@ builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
 builder.Services.AddScoped<IRecommendationRepository, RecommendationRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IOtpService, OtpService>();
+
+// ✅ NEW: Jitsi JWT service
+builder.Services.AddScoped<IJitsiTokenService, JitsiTokenService>();
 #endregion
 
 #region JWT
@@ -99,9 +102,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(jwtKey)
-            ),
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
             ValidateIssuer = true,
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
             ValidateAudience = true,
@@ -120,15 +121,14 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 if (string.IsNullOrWhiteSpace(token))
                 {
                     context.Fail("Token is missing.");
-
                     return;
                 }
 
-                var revocationService = context.HttpContext.RequestServices.GetRequiredService<IJwtTokenRevocationService>();
+                var revocationService = context.HttpContext.RequestServices
+                    .GetRequiredService<IJwtTokenRevocationService>();
+
                 if (await revocationService.IsRevokedAsync(token))
-                {
                     context.Fail("Token has been revoked.");
-                }
             }
         };
     });
@@ -138,11 +138,11 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
+// ✅ FIXED: Seeder only runs in Development — never in Production
+if (app.Environment.IsDevelopment())
 {
-    var dbContext =
-        scope.ServiceProvider.GetRequiredService<SolidDbContext>();
-
+    using var scope = app.Services.CreateScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<SolidDbContext>();
     await DatabaseSeeder.SeedAsync(dbContext);
 }
 
@@ -164,8 +164,7 @@ api.MapContentSlice();
 api.MapLookupSlice();
 api.MapAuthSlice();
 
-var protectedApi = api.MapGroup("")
-    .RequireAuthorization();
+var protectedApi = api.MapGroup("").RequireAuthorization();
 
 protectedApi.MapUserSlice();
 protectedApi.MapGroupSlice();
@@ -175,7 +174,6 @@ protectedApi.MapRecommendationSlice();
 protectedApi.MapSettingsSlice();
 #endregion
 
-app.MapHub<NotificationsHub>("/hubs/notifications")
-    .RequireAuthorization();
+app.MapHub<NotificationsHub>("/hubs/notifications").RequireAuthorization();
 
 app.Run();

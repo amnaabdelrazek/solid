@@ -3,6 +3,7 @@ using Solid.Api.Common;
 using Solid.Api.Database.Entities;
 using Solid.Api.Database.Repositories;
 using Solid.Api.Infrastructure.Auth;
+using Solid.Api.Infrastructure.Jitsi;
 
 namespace Solid.Api.Features.Sessions;
 
@@ -25,13 +26,7 @@ public static class SessionSlice
 
     private static async Task<IResult> Index(IAuthContext auth, ISessionRepository sessionRepository)
     {
-        //if (!auth.IsAdminOrInstructor())
-        //{
-        //    return ApiResponse.Fail("This action is unauthorized.", StatusCodes.Status403Forbidden);
-        //}
-
         var sessions = await sessionRepository.ListForUserAsync(auth.UserId, auth.Role);
-
         return ApiResponse.Ok(new { sessions = sessions.Select(SessionResource.From) });
     }
 
@@ -40,24 +35,15 @@ public static class SessionSlice
         [FromBody] CreateSessionRequest request,
         ISessionRepository sessionRepository)
     {
-        //if (!auth.IsAdminOrInstructor())
-        //{
-        //    return ApiResponse.Fail("This action is unauthorized.", StatusCodes.Status403Forbidden);
-        //}
-
         if (request.group_id <= 0 || request.scheduled_at == default)
-        {
             return ApiResponse.Fail("The given data was invalid.", StatusCodes.Status422UnprocessableEntity);
-        }
 
         var instructorId = auth.IsInstructor()
             ? auth.UserId
             : request.instructor_id;
 
         if (instructorId is null or <= 0)
-        {
             return ApiResponse.Fail("Instructor is required.", StatusCodes.Status422UnprocessableEntity);
-        }
 
         var result = await sessionRepository.CreateAsync(new SessionCreate(
             request.group_id,
@@ -71,9 +57,7 @@ public static class SessionSlice
             request.metadata));
 
         if (result.Session is null)
-        {
             return ApiResponse.Fail(result.Error ?? "Unable to create session.", result.StatusCode);
-        }
 
         return ApiResponse.Ok(new { session = SessionResource.From(result.Session) }, "Session created successfully.");
     }
@@ -81,7 +65,6 @@ public static class SessionSlice
     private static async Task<IResult> MeUpcomingSessions(IAuthContext auth, ISessionRepository sessionRepository)
     {
         var sessions = await sessionRepository.PaidForUserAsync(auth.UserId);
-
         return ApiResponse.Ok(new { sessions = sessions.Select(SessionResource.From) });
     }
 
@@ -94,19 +77,40 @@ public static class SessionSlice
             : ApiResponse.Ok(new { session = SessionResource.From(session) });
     }
 
-    private static async Task<IResult> Join(long sessionId, IAuthContext auth, ISessionRepository sessionRepository, IConfiguration configuration)
+    private static async Task<IResult> Join(
+        long sessionId,
+        IAuthContext auth,
+        ISessionRepository sessionRepository,
+        IUserRepository userRepository,
+        IJitsiTokenService jitsiTokenService,
+        IConfiguration configuration)
     {
         var result = await sessionRepository.RecordJoinAsync(sessionId, auth.UserId);
         if (!result.Success || result.Session is null)
-        {
             return ApiResponse.Fail(result.Error ?? "Unable to join session.", result.StatusCode);
+
+        var user = await userRepository.FindAsync(auth.UserId);
+
+        string jitsiJwt;
+        try
+        {
+            jitsiJwt = jitsiTokenService.Create(
+                auth.UserId,
+                user?.DisplayName ?? "User",
+                result.Session.JitsiRoomName,
+                isModerator: false);
+        }
+        catch (InvalidOperationException)
+        {
+            // Jitsi not configured — return placeholder so mobile doesn't break
+            jitsiJwt = string.Empty;
         }
 
         return ApiResponse.Ok(new
         {
-            jitsi_jwt = Hashing.RandomToken(48),
+            jitsi_jwt = jitsiJwt,
             jitsi_room_name = result.Session.JitsiRoomName,
-            jitsi_server_url = configuration["Jitsi:ServerUrl"] ?? "",
+            jitsi_server_url = configuration["Jitsi:ServerUrl"] ?? string.Empty,
             session_duration_minutes = result.Session.DurationMinutes
         });
     }
@@ -114,30 +118,48 @@ public static class SessionSlice
     private static async Task<IResult> Leave(long sessionId, IAuthContext auth, ISessionRepository sessionRepository)
     {
         await sessionRepository.LeaveAsync(sessionId, auth.UserId);
-
         return ApiResponse.Ok(message: "Left session successfully.");
     }
 
-    private static async Task<IResult> Start(long sessionId, IAuthContext auth, ISessionRepository sessionRepository, IConfiguration configuration)
+    private static async Task<IResult> Start(
+        long sessionId,
+        IAuthContext auth,
+        ISessionRepository sessionRepository,
+        IUserRepository userRepository,
+        IJitsiTokenService jitsiTokenService,
+        IConfiguration configuration)
     {
-        //if (!auth.IsAdminOrInstructor())
-        //{
-        //    return ApiResponse.Fail("This action is unauthorized.", StatusCodes.Status403Forbidden);
-        //}
+        // Only admin or the session's instructor can start
+        if (!auth.IsAdminOrInstructor())
+            return ApiResponse.Fail("This action is unauthorized.", StatusCodes.Status403Forbidden);
 
         await sessionRepository.StartAsync(sessionId);
         var session = await sessionRepository.FindAnyAsync(sessionId);
         if (session is null)
-        {
             return ApiResponse.Fail("Not found.", StatusCodes.Status404NotFound);
+
+        var user = await userRepository.FindAsync(auth.UserId);
+
+        string jitsiJwt;
+        try
+        {
+            jitsiJwt = jitsiTokenService.Create(
+                auth.UserId,
+                user?.DisplayName ?? "Instructor",
+                session.JitsiRoomName,
+                isModerator: true); // instructor = moderator
+        }
+        catch (InvalidOperationException)
+        {
+            jitsiJwt = string.Empty;
         }
 
         return ApiResponse.Ok(new
         {
             session = SessionResource.From(session),
-            jitsi_jwt = Hashing.RandomToken(48),
+            jitsi_jwt = jitsiJwt,
             jitsi_room_name = session.JitsiRoomName,
-            jitsi_server_url = configuration["Jitsi:ServerUrl"] ?? "",
+            jitsi_server_url = configuration["Jitsi:ServerUrl"] ?? string.Empty,
             session_duration_minutes = session.DurationMinutes
         }, "Session started.");
     }
@@ -145,20 +167,26 @@ public static class SessionSlice
     private static async Task<IResult> End(long sessionId, IAuthContext auth, ISessionRepository sessionRepository)
     {
         if (!auth.IsAdminOrInstructor())
-        {
             return ApiResponse.Fail("This action is unauthorized.", StatusCodes.Status403Forbidden);
-        }
 
         await sessionRepository.EndAsync(sessionId);
-
         return ApiResponse.Ok(message: "Session ended.");
     }
 
-    private static async Task<IResult> Feedback(long sessionId, IAuthContext auth, [FromBody] FeedbackRequest request, ISessionRepository sessionRepository)
+    private static async Task<IResult> Feedback(
+        long sessionId,
+        IAuthContext auth,
+        [FromBody] FeedbackRequest request,
+        ISessionRepository sessionRepository)
     {
+        if (request.rating is < 1 or > 5)
+            return ApiResponse.Fail("Rating must be between 1 and 5.", StatusCodes.Status422UnprocessableEntity);
+
         var attendance = await sessionRepository.SaveFeedbackAsync(sessionId, auth.UserId, request.rating, request.comment);
 
-        return ApiResponse.Ok(new { attendance = attendance is null ? null : AttendanceResource(attendance) }, "Feedback submitted successfully.");
+        return attendance is null
+            ? ApiResponse.Fail("You did not attend this session.", StatusCodes.Status404NotFound)
+            : ApiResponse.Ok(new { attendance = AttendanceResource(attendance) }, "Feedback submitted successfully.");
     }
 
     private static object AttendanceResource(SessionAttendance attendance)

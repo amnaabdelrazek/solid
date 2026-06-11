@@ -38,9 +38,7 @@ public static class SessionSlice
         if (request.group_id <= 0 || request.scheduled_at == default)
             return ApiResponse.Fail("The given data was invalid.", StatusCodes.Status422UnprocessableEntity);
 
-        var instructorId = auth.IsInstructor()
-            ? auth.UserId
-            : request.instructor_id;
+        var instructorId = auth.IsInstructor() ? auth.UserId : request.instructor_id;
 
         if (instructorId is null or <= 0)
             return ApiResponse.Fail("Instructor is required.", StatusCodes.Status422UnprocessableEntity);
@@ -59,16 +57,23 @@ public static class SessionSlice
         if (result.Session is null)
             return ApiResponse.Fail(result.Error ?? "Unable to create session.", result.StatusCode);
 
-        return ApiResponse.Ok(new { session = SessionResource.From(result.Session) }, "Session created successfully.");
+        return ApiResponse.Ok(
+            new { session = SessionResource.From(result.Session) },
+            "Session created successfully.");
     }
 
-    private static async Task<IResult> MeUpcomingSessions(IAuthContext auth, ISessionRepository sessionRepository)
+    private static async Task<IResult> MeUpcomingSessions(
+        IAuthContext auth,
+        ISessionRepository sessionRepository)
     {
         var sessions = await sessionRepository.PaidForUserAsync(auth.UserId);
         return ApiResponse.Ok(new { sessions = sessions.Select(SessionResource.From) });
     }
 
-    private static async Task<IResult> Show(long sessionId, IAuthContext auth, ISessionRepository sessionRepository)
+    private static async Task<IResult> Show(
+        long sessionId,
+        IAuthContext auth,
+        ISessionRepository sessionRepository)
     {
         var session = await sessionRepository.FindAsync(sessionId, auth.UserId, auth.Role);
 
@@ -77,12 +82,14 @@ public static class SessionSlice
             : ApiResponse.Ok(new { session = SessionResource.From(session) });
     }
 
+    // ── JOIN ─────────────────────────────────────────────────────────────────
+
     private static async Task<IResult> Join(
         long sessionId,
         IAuthContext auth,
         ISessionRepository sessionRepository,
         IUserRepository userRepository,
-        IJitsiTokenService jitsiTokenService,
+        IJaasTokenService jaasTokenService,
         IConfiguration configuration)
     {
         var result = await sessionRepository.RecordJoinAsync(sessionId, auth.UserId);
@@ -91,80 +98,83 @@ public static class SessionSlice
 
         var user = await userRepository.FindAsync(auth.UserId);
 
-        string jitsiJwt;
-        try
-        {
-            jitsiJwt = jitsiTokenService.Create(
-                auth.UserId,
-                user?.DisplayName ?? "User",
-                result.Session.JitsiRoomName,
-                isModerator: false);
-        }
-        catch (InvalidOperationException)
-        {
-            // Jitsi not configured — return placeholder so mobile doesn't break
-            jitsiJwt = string.Empty;
-        }
+        var (jwt, meetingUrl) = BuildJaasResponse(
+            jaasTokenService,
+            configuration,
+            auth.UserId,
+            user?.DisplayName ?? "User",
+            user?.AvatarUrl,
+            result.Session.JitsiRoomName,
+            isModerator: false);
 
         return ApiResponse.Ok(new
         {
-            jitsi_jwt = jitsiJwt,
+            jitsi_jwt = jwt,
             jitsi_room_name = result.Session.JitsiRoomName,
-            jitsi_server_url = configuration["Jitsi:ServerUrl"] ?? string.Empty,
+            jitsi_server_url = GetServerUrl(configuration),
+            meeting_url = meetingUrl,
             session_duration_minutes = result.Session.DurationMinutes
         });
     }
 
-    private static async Task<IResult> Leave(long sessionId, IAuthContext auth, ISessionRepository sessionRepository)
+    // ── LEAVE ────────────────────────────────────────────────────────────────
+
+    private static async Task<IResult> Leave(
+        long sessionId,
+        IAuthContext auth,
+        ISessionRepository sessionRepository)
     {
         await sessionRepository.LeaveAsync(sessionId, auth.UserId);
         return ApiResponse.Ok(message: "Left session successfully.");
     }
+
+    // ── START (instructor / admin only) ──────────────────────────────────────
 
     private static async Task<IResult> Start(
         long sessionId,
         IAuthContext auth,
         ISessionRepository sessionRepository,
         IUserRepository userRepository,
-        IJitsiTokenService jitsiTokenService,
+        IJaasTokenService jaasTokenService,
         IConfiguration configuration)
     {
-        // Only admin or the session's instructor can start
         if (!auth.IsAdminOrInstructor())
             return ApiResponse.Fail("This action is unauthorized.", StatusCodes.Status403Forbidden);
 
         await sessionRepository.StartAsync(sessionId);
+
         var session = await sessionRepository.FindAnyAsync(sessionId);
         if (session is null)
             return ApiResponse.Fail("Not found.", StatusCodes.Status404NotFound);
 
         var user = await userRepository.FindAsync(auth.UserId);
 
-        string jitsiJwt;
-        try
-        {
-            jitsiJwt = jitsiTokenService.Create(
-                auth.UserId,
-                user?.DisplayName ?? "Instructor",
-                session.JitsiRoomName,
-                isModerator: true); // instructor = moderator
-        }
-        catch (InvalidOperationException)
-        {
-            jitsiJwt = string.Empty;
-        }
+        var (jwt, meetingUrl) = BuildJaasResponse(
+            jaasTokenService,
+            configuration,
+            auth.UserId,
+            user?.DisplayName ?? "Instructor",
+            user?.AvatarUrl,
+            session.JitsiRoomName,
+            isModerator: true);
 
         return ApiResponse.Ok(new
         {
             session = SessionResource.From(session),
-            jitsi_jwt = jitsiJwt,
+            jitsi_jwt = jwt,
             jitsi_room_name = session.JitsiRoomName,
-            jitsi_server_url = configuration["Jitsi:ServerUrl"] ?? string.Empty,
+            jitsi_server_url = GetServerUrl(configuration),
+            meeting_url = meetingUrl,
             session_duration_minutes = session.DurationMinutes
         }, "Session started.");
     }
 
-    private static async Task<IResult> End(long sessionId, IAuthContext auth, ISessionRepository sessionRepository)
+    // ── END ──────────────────────────────────────────────────────────────────
+
+    private static async Task<IResult> End(
+        long sessionId,
+        IAuthContext auth,
+        ISessionRepository sessionRepository)
     {
         if (!auth.IsAdminOrInstructor())
             return ApiResponse.Fail("This action is unauthorized.", StatusCodes.Status403Forbidden);
@@ -172,6 +182,8 @@ public static class SessionSlice
         await sessionRepository.EndAsync(sessionId);
         return ApiResponse.Ok(message: "Session ended.");
     }
+
+    // ── FEEDBACK ─────────────────────────────────────────────────────────────
 
     private static async Task<IResult> Feedback(
         long sessionId,
@@ -182,29 +194,68 @@ public static class SessionSlice
         if (request.rating is < 1 or > 5)
             return ApiResponse.Fail("Rating must be between 1 and 5.", StatusCodes.Status422UnprocessableEntity);
 
-        var attendance = await sessionRepository.SaveFeedbackAsync(sessionId, auth.UserId, request.rating, request.comment);
+        var attendance = await sessionRepository.SaveFeedbackAsync(
+            sessionId, auth.UserId, request.rating, request.comment);
 
         return attendance is null
             ? ApiResponse.Fail("You did not attend this session.", StatusCodes.Status404NotFound)
-            : ApiResponse.Ok(new { attendance = AttendanceResource(attendance) }, "Feedback submitted successfully.");
+            : ApiResponse.Ok(
+                new { attendance = AttendanceResource(attendance) },
+                "Feedback submitted successfully.");
     }
 
-    private static object AttendanceResource(SessionAttendance attendance)
+    // ─────────────────────────────────────────────────────────────────────────
+    // Helpers
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private static (string Jwt, string MeetingUrl) BuildJaasResponse(
+        IJaasTokenService jaasTokenService,
+        IConfiguration configuration,
+        long userId,
+        string displayName,
+        string? avatarUrl,
+        string roomName,
+        bool isModerator)
     {
-        return new
+        var appId = configuration["Jaas:AppId"] ?? string.Empty;
+        var serverUrl = GetServerUrl(configuration);
+
+        try
         {
-            id = attendance.Id,
-            session_id = attendance.SessionId,
-            user_id = attendance.UserId,
-            joined_at = attendance.JoinedAt,
-            left_at = attendance.LeftAt,
-            was_present = attendance.WasPresent,
-            rating = attendance.Rating,
-            comment = attendance.Comment,
-            created_at = attendance.CreatedAt,
-            updated_at = attendance.UpdatedAt
-        };
+            var jwt = jaasTokenService.Create(userId, displayName, avatarUrl, roomName, isModerator);
+
+            // JaaS meeting URL: https://8x8.vc/{appId}/{roomName}
+            var meetingUrl = string.IsNullOrWhiteSpace(appId)
+                ? $"{serverUrl}/{roomName}"
+                : $"https://8x8.vc/{appId}/{roomName}";
+
+            return (jwt, meetingUrl);
+        }
+        catch (InvalidOperationException ex)
+        {
+            Console.Error.WriteLine($"[JaaS] Token creation failed: {ex.Message}");
+            return (string.Empty, string.Empty);
+        }
     }
+
+    private static string GetServerUrl(IConfiguration configuration)
+        => configuration["Jaas:ServerUrl"]
+           ?? configuration["Jitsi:ServerUrl"]
+           ?? "https://8x8.vc";
+
+    private static object AttendanceResource(SessionAttendance attendance) => new
+    {
+        id = attendance.Id,
+        session_id = attendance.SessionId,
+        user_id = attendance.UserId,
+        joined_at = attendance.JoinedAt,
+        left_at = attendance.LeftAt,
+        was_present = attendance.WasPresent,
+        rating = attendance.Rating,
+        comment = attendance.Comment,
+        created_at = attendance.CreatedAt,
+        updated_at = attendance.UpdatedAt
+    };
 }
 
 public sealed record CreateSessionRequest(

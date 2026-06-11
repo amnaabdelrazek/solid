@@ -25,7 +25,6 @@ var builder = WebApplication.CreateBuilder(args);
 
 #region Swagger
 builder.Services.AddEndpointsApiExplorer();
-
 builder.Services.AddSwaggerGen(options =>
 {
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
@@ -37,17 +36,12 @@ builder.Services.AddSwaggerGen(options =>
         In = ParameterLocation.Header,
         Description = "Enter: Bearer {your token}"
     });
-
     options.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
             new OpenApiSecurityScheme
             {
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
+                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
             },
             Array.Empty<string>()
         }
@@ -88,11 +82,11 @@ builder.Services.AddScoped<IRecommendationRepository, RecommendationRepository>(
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IOtpService, OtpService>();
 
-// ✅ NEW: Jitsi JWT service
-builder.Services.AddScoped<IJitsiTokenService, JitsiTokenService>();
+// ✅ JaaS token service
+builder.Services.AddScoped<IJaasTokenService, JaasTokenService>();
 #endregion
 
-#region JWT
+#region JWT Auth
 var jwtKey = builder.Configuration["Jwt:Key"]
     ?? throw new InvalidOperationException("Jwt:Key is required.");
 
@@ -110,23 +104,16 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromMinutes(1)
         };
-
         options.Events = new JwtBearerEvents
         {
             OnTokenValidated = async context =>
             {
                 var authorization = context.HttpContext.Request.Headers.Authorization.FirstOrDefault();
                 var token = authorization?.Replace("Bearer ", "", StringComparison.OrdinalIgnoreCase);
-
-                if (string.IsNullOrWhiteSpace(token))
-                {
-                    context.Fail("Token is missing.");
-                    return;
-                }
+                if (string.IsNullOrWhiteSpace(token)) { context.Fail("Token is missing."); return; }
 
                 var revocationService = context.HttpContext.RequestServices
                     .GetRequiredService<IJwtTokenRevocationService>();
-
                 if (await revocationService.IsRevokedAsync(token))
                     context.Fail("Token has been revoked.");
             }
@@ -138,7 +125,7 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-// ✅ FIXED: Seeder only runs in Development — never in Production
+// ✅ Seeder only in Development
 if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
@@ -146,18 +133,16 @@ if (app.Environment.IsDevelopment())
     await DatabaseSeeder.SeedAsync(dbContext);
 }
 
-#region Swagger Middleware
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-#endregion
 
 app.UseAuthentication();
 app.UseAuthorization();
 
-#region API
+#region API Routes
 var api = app.MapGroup("/api");
 
 api.MapContentSlice();
@@ -165,7 +150,6 @@ api.MapLookupSlice();
 api.MapAuthSlice();
 
 var protectedApi = api.MapGroup("").RequireAuthorization();
-
 protectedApi.MapUserSlice();
 protectedApi.MapGroupSlice();
 protectedApi.MapSessionSlice();

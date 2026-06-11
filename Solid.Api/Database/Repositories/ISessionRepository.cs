@@ -6,7 +6,9 @@ public interface ISessionRepository
 {
     Task<IReadOnlyList<TherapySession>> ListForUserAsync(long userId, string? role);
 
-    Task<IReadOnlyList<TherapySession>> PaidForUserAsync(long userId);
+    Task<IReadOnlyList<TherapySession>> UpcomingPaidForUserAsync(long userId);
+
+    Task<IReadOnlyList<TherapySession>> UpcomingUnpaidForUserAsync(long userId);
 
     Task<TherapySession?> FindAsync(long sessionId, long userId, string? role);
 
@@ -15,6 +17,8 @@ public interface ISessionRepository
     Task<CreateSessionResult> CreateAsync(SessionCreate create);
 
     Task<JoinSessionResult> RecordJoinAsync(long sessionId, long userId);
+
+    Task<SessionBookingResult> ValidateBookingAsync(long sessionId, long userId);
 
     Task LeaveAsync(long sessionId, long userId);
 
@@ -39,3 +43,5 @@ public sealed record SessionCreate(
 public sealed record CreateSessionResult(TherapySession? Session, string? Error, int StatusCode);
 
 public sealed record JoinSessionResult(bool Success, TherapySession? Session, string? Error, int StatusCode);
+
+public sealed record SessionBookingResult(bool Success, string? Error, int StatusCode);

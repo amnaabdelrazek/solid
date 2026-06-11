@@ -125,23 +125,63 @@ public static class AuthSlice
         return ApiResponse.Ok(message: "Registration successful.");
     }
 
-    private static async Task<IResult> Login([FromBody] LoginRequest request, IAuthService authService)
+    //private static async Task<IResult> Login([FromBody] LoginRequest request, IAuthService authService)
+    //{
+    //    if (string.IsNullOrWhiteSpace(request.mobile_number) || string.IsNullOrWhiteSpace(request.password))
+    //        return ApiResponse.Fail("Mobile number and password are required.", StatusCodes.Status422UnprocessableEntity);
+
+    //    if (!PhoneNumberValidator.TryNormalize(request.mobile_number, out var normalizedMobileNumber))
+    //    {
+    //        return ApiResponse.Fail(PhoneNumberValidator.Message, StatusCodes.Status422UnprocessableEntity);
+    //    }
+
+    //    request = request with { mobile_number = normalizedMobileNumber };
+
+    //    var payload = await authService.LoginAsync(request);
+    //    if (payload is null)
+    //    {
+    //        return ApiResponse.Fail("Unauthenticated.", StatusCodes.Status401Unauthorized);
+    //    }
+
+    //    return ApiResponse.Ok(new { token = payload.Token, token_type = payload.TokenType, user = payload.User });
+    //}
+
+
+    private static async Task<IResult> Login(HttpContext httpContext, IAuthService authService)
     {
+        LoginRequest request;
+
+        if (httpContext.Request.HasJsonContentType())
+        {
+            request = await httpContext.Request.ReadFromJsonAsync<LoginRequest>();
+            if(request==null)
+                 return ApiResponse.Fail("Invalid request body.", StatusCodes.Status422UnprocessableEntity);
+        }
+        else if (httpContext.Request.HasFormContentType)
+        {
+            var form = await httpContext.Request.ReadFormAsync();
+            request = new LoginRequest(
+                form["mobile_number"].FirstOrDefault() ?? string.Empty,
+                form["password"].FirstOrDefault() ?? string.Empty,
+                form["device_id"].FirstOrDefault() ?? string.Empty);
+        }
+        else
+        {
+            return ApiResponse.Fail("Unsupported content type.", StatusCodes.Status415UnsupportedMediaType);
+        }
+
         if (string.IsNullOrWhiteSpace(request.mobile_number) || string.IsNullOrWhiteSpace(request.password))
             return ApiResponse.Fail("Mobile number and password are required.", StatusCodes.Status422UnprocessableEntity);
 
+        // rest of your existing logic...
         if (!PhoneNumberValidator.TryNormalize(request.mobile_number, out var normalizedMobileNumber))
-        {
             return ApiResponse.Fail(PhoneNumberValidator.Message, StatusCodes.Status422UnprocessableEntity);
-        }
 
         request = request with { mobile_number = normalizedMobileNumber };
 
         var payload = await authService.LoginAsync(request);
         if (payload is null)
-        {
             return ApiResponse.Fail("Unauthenticated.", StatusCodes.Status401Unauthorized);
-        }
 
         return ApiResponse.Ok(new { token = payload.Token, token_type = payload.TokenType, user = payload.User });
     }

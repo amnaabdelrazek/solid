@@ -13,7 +13,9 @@ public static class SessionSlice
     {
         api.MapGet("/sessions", Index);
         api.MapPost("/sessions", Create);
-        api.MapGet("/sessions/me", MeUpcomingSessions);
+        api.MapGet("/sessions/upcoming", Upcoming);
+        api.MapGet("/sessions/upcoming/unpaid", UpcomingUnpaid);
+        api.MapGet("/sessions/me", Upcoming);
         api.MapGet("/sessions/{sessionId:long}", Show);
         api.MapPost("/sessions/{sessionId:long}/join", Join);
         api.MapPost("/sessions/{sessionId:long}/leave", Leave);
@@ -62,11 +64,19 @@ public static class SessionSlice
             "Session created successfully.");
     }
 
-    private static async Task<IResult> MeUpcomingSessions(
+    private static async Task<IResult> Upcoming(
         IAuthContext auth,
         ISessionRepository sessionRepository)
     {
-        var sessions = await sessionRepository.PaidForUserAsync(auth.UserId);
+        var sessions = await sessionRepository.UpcomingPaidForUserAsync(auth.UserId);
+        return ApiResponse.Ok(new { sessions = sessions.Select(SessionResource.From) });
+    }
+
+    private static async Task<IResult> UpcomingUnpaid(
+        IAuthContext auth,
+        ISessionRepository sessionRepository)
+    {
+        var sessions = await sessionRepository.UpcomingUnpaidForUserAsync(auth.UserId);
         return ApiResponse.Ok(new { sessions = sessions.Select(SessionResource.From) });
     }
 

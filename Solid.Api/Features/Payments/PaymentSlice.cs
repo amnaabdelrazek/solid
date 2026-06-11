@@ -12,6 +12,8 @@ public static class PaymentSlice
     public static IEndpointRouteBuilder MapPaymentSlice(this IEndpointRouteBuilder api)
     {
         api.MapPost("/payments/initiate/{sessionId:long}", Initiate);
+        api.MapGet("/payments/success", Success).AllowAnonymous();
+        api.MapGet("/payments/cancel", Cancel).AllowAnonymous();
         api.MapGet("/payments/history", History);
         api.MapPost("/payment-methods", StorePaymentMethod);
         api.MapGet("/payment-methods", PaymentMethods);
@@ -26,10 +28,12 @@ public static class PaymentSlice
         ISettingsRepository settingsRepository,
         IPaymentRepository paymentRepository,
         ISessionRepository sessionRepository,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        HttpRequest httpRequest)
     {
-        if (await sessionRepository.FindAnyAsync(sessionId) is null)
-            return ApiResponse.Fail("Session not found.", StatusCodes.Status404NotFound);
+        var bookingValidation = await sessionRepository.ValidateBookingAsync(sessionId, auth.UserId);
+        if (!bookingValidation.Success)
+            return ApiResponse.Fail(bookingValidation.Error ?? "Unable to book session.", bookingValidation.StatusCode);
 
         var settingsAmount = await settingsRepository.GetAsync("general", "session_price");
         decimal.TryParse(settingsAmount, out var amount);
@@ -38,16 +42,19 @@ public static class PaymentSlice
 
         StripeConfiguration.ApiKey = configuration["Stripe:SecretKey"];
 
+        var paymentMetadata = new Dictionary<string, string>
+        {
+            ["payment_id"] = payment.Id.ToString(),
+            ["session_id"] = sessionId.ToString(),
+            ["user_id"] = auth.UserId.ToString()
+        };
+
         var options = new SessionCreateOptions
         {
+            Metadata = paymentMetadata,
             PaymentIntentData = new SessionPaymentIntentDataOptions
             {
-                Metadata = new Dictionary<string, string>
-                {
-                    ["payment_id"] = payment.Id.ToString(),
-                    ["session_id"] = sessionId.ToString(),
-                    ["user_id"] = auth.UserId.ToString()
-                }
+                Metadata = paymentMetadata
             },
             PaymentMethodTypes = ["card"],
             LineItems =
@@ -67,8 +74,8 @@ public static class PaymentSlice
                 }
             ],
             Mode = "payment",
-            SuccessUrl = $"{configuration["App:BaseUrl"]}/api/payments/success?paymentId={payment.Id}&session_id={{CHECKOUT_SESSION_ID}}",
-            CancelUrl = $"{configuration["App:BaseUrl"]}/api/payments/cancel?paymentId={payment.Id}",
+            SuccessUrl = $"{ResolveBaseUrl(configuration, httpRequest)}/api/payments/success?paymentId={payment.Id}&session_id={{CHECKOUT_SESSION_ID}}",
+            CancelUrl = $"{ResolveBaseUrl(configuration, httpRequest)}/api/payments/cancel?paymentId={payment.Id}",
         };
 
         var service = new SessionService();
@@ -81,6 +88,52 @@ public static class PaymentSlice
             payment = PaymentResource.From(payment),
             payment_url = checkoutSession.Url
         });
+    }
+
+    private static async Task<IResult> Success(
+        [FromQuery] long paymentId,
+        [FromQuery(Name = "session_id")] string? checkoutSessionId,
+        IPaymentRepository paymentRepository,
+        IConfiguration configuration)
+    {
+        if (string.IsNullOrWhiteSpace(checkoutSessionId))
+            return ApiResponse.Fail("Checkout session is required.", StatusCodes.Status422UnprocessableEntity);
+
+        StripeConfiguration.ApiKey = configuration["Stripe:SecretKey"];
+
+        var service = new SessionService();
+        var checkoutSession = await service.GetAsync(checkoutSessionId);
+
+        if (checkoutSession.PaymentStatus != "paid")
+            return ApiResponse.Fail("Payment has not been completed.", StatusCodes.Status422UnprocessableEntity);
+
+        var metadataPaymentId = checkoutSession.Metadata.TryGetValue("payment_id", out var checkoutPaymentId)
+            ? checkoutPaymentId
+            : null;
+
+        if (metadataPaymentId is null && checkoutSession.PaymentIntentId is not null)
+        {
+            var paymentIntentService = new PaymentIntentService();
+            var paymentIntent = await paymentIntentService.GetAsync(checkoutSession.PaymentIntentId);
+
+            metadataPaymentId = paymentIntent.Metadata.TryGetValue("payment_id", out var intentPaymentId)
+                ? intentPaymentId
+                : null;
+        }
+
+        if (metadataPaymentId != paymentId.ToString())
+        {
+            return ApiResponse.Fail("Payment session mismatch.", StatusCodes.Status422UnprocessableEntity);
+        }
+
+        await paymentRepository.MarkAsPaidAsync(paymentId, checkoutSession.Id);
+
+        return ApiResponse.Ok(message: "Payment completed successfully.");
+    }
+
+    private static IResult Cancel([FromQuery] long paymentId)
+    {
+        return ApiResponse.Fail($"Payment #{paymentId} was cancelled.", StatusCodes.Status422UnprocessableEntity);
     }
 
     private static async Task<IResult> WebhookStripe(
@@ -163,6 +216,19 @@ public static class PaymentSlice
     {
         var paymentMethods = await paymentRepository.PaymentMethodsAsync(auth.UserId);
         return ApiResponse.Ok(new { payment_methods = paymentMethods.Select(PaymentMethodResource.From) });
+    }
+
+    private static string ResolveBaseUrl(IConfiguration configuration, HttpRequest request)
+    {
+        var configuredBaseUrl = configuration["App:BaseUrl"];
+
+        if (!string.IsNullOrWhiteSpace(configuredBaseUrl) &&
+            !configuredBaseUrl.Contains("your-domain.com", StringComparison.OrdinalIgnoreCase))
+        {
+            return configuredBaseUrl.TrimEnd('/');
+        }
+
+        return $"{request.Scheme}://{request.Host}".TrimEnd('/');
     }
 }
 

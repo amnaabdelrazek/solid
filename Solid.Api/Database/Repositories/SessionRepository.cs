@@ -34,13 +34,37 @@ public sealed class SessionRepository(SolidDbContext dbContext) : ISessionReposi
             .ToList();
     }
 
-    public async Task<IReadOnlyList<TherapySession>> PaidForUserAsync(long userId)
+    public async Task<IReadOnlyList<TherapySession>> UpcomingPaidForUserAsync(long userId)
     {
-        return await dbContext.Payments
+        var now = DateTime.UtcNow;
+
+        return await dbContext.TherapySessions
             .AsNoTracking()
-            .Where(payment => payment.UserId == userId && payment.Status == "paid" && payment.Session != null && payment.Session.DeletedAt == null)
-            .OrderBy(payment => payment.Session!.ScheduledAt)
-            .Select(payment => payment.Session!)
+            .Include(session => session.Group)
+            .Include(session => session.Attendances)
+            .Where(session => session.DeletedAt == null)
+            .Where(session => session.ScheduledAt > now)
+            .Where(session => session.Payments.Any(payment => payment.UserId == userId && payment.Status == "paid"))
+            .OrderBy(session => session.SessionNumber ?? int.MaxValue)
+            .ThenBy(session => session.ScheduledAt)
+            .Take(10)
+            .ToListAsync();
+    }
+
+    public async Task<IReadOnlyList<TherapySession>> UpcomingUnpaidForUserAsync(long userId)
+    {
+        var now = DateTime.UtcNow;
+
+        return await dbContext.TherapySessions
+            .AsNoTracking()
+            .Include(session => session.Group)
+            .Include(session => session.Attendances)
+            .Where(session => session.DeletedAt == null)
+            .Where(session => session.ScheduledAt > now)
+            .Where(session => session.Group.Members.Any(member => member.UserId == userId && member.IsActive))
+            .Where(session => !session.Payments.Any(payment => payment.UserId == userId && payment.Status == "paid"))
+            .OrderBy(session => session.SessionNumber ?? int.MaxValue)
+            .ThenBy(session => session.ScheduledAt)
             .Take(10)
             .ToListAsync();
     }
@@ -177,6 +201,70 @@ public sealed class SessionRepository(SolidDbContext dbContext) : ISessionReposi
         await dbContext.SaveChangesAsync();
 
         return new JoinSessionResult(true, session, null, StatusCodes.Status200OK);
+    }
+
+    public async Task<SessionBookingResult> ValidateBookingAsync(long sessionId, long userId)
+    {
+        var session = await dbContext.TherapySessions
+            .AsNoTracking()
+            .Include(session => session.Group.Members)
+            .FirstOrDefaultAsync(session => session.Id == sessionId && session.DeletedAt == null);
+
+        if (session is null)
+        {
+            return new SessionBookingResult(false, "Session not found.", StatusCodes.Status404NotFound);
+        }
+
+        if (session.ScheduledAt <= DateTime.UtcNow)
+        {
+            return new SessionBookingResult(false, "You can only book upcoming sessions.", StatusCodes.Status422UnprocessableEntity);
+        }
+
+        if (!session.Group.Members.Any(member => member.UserId == userId && member.IsActive))
+        {
+            return new SessionBookingResult(false, "You are not subscribed to this session group.", StatusCodes.Status403Forbidden);
+        }
+
+        var alreadyPaid = await dbContext.Payments
+            .AsNoTracking()
+            .AnyAsync(payment => payment.UserId == userId && payment.SessionId == sessionId && payment.Status == "paid");
+
+        if (alreadyPaid)
+        {
+            return new SessionBookingResult(false, "You have already paid for this session.", StatusCodes.Status422UnprocessableEntity);
+        }
+
+        var now = DateTime.UtcNow;
+        var previousPaidSessions = dbContext.TherapySessions
+            .AsNoTracking()
+            .Where(previous => previous.DeletedAt == null)
+            .Where(previous => previous.GroupId == session.GroupId)
+            .Where(previous => previous.ScheduledAt > now)
+            .Where(previous => previous.Id != session.Id);
+
+        previousPaidSessions = session.SessionNumber.HasValue
+            ? previousPaidSessions.Where(previous =>
+                previous.SessionNumber.HasValue && previous.SessionNumber.Value < session.SessionNumber.Value ||
+                previous.SessionNumber == session.SessionNumber && (previous.ScheduledAt < session.ScheduledAt ||
+                    previous.ScheduledAt == session.ScheduledAt && previous.Id < session.Id))
+            : previousPaidSessions.Where(previous => previous.ScheduledAt < session.ScheduledAt ||
+                previous.ScheduledAt == session.ScheduledAt && previous.Id < session.Id);
+
+        var firstUnpaidPreviousSession = await previousPaidSessions
+            .Where(previous => !previous.Payments.Any(payment => payment.UserId == userId && payment.Status == "paid"))
+            .OrderBy(previous => previous.SessionNumber ?? int.MaxValue)
+            .ThenBy(previous => previous.ScheduledAt)
+            .FirstOrDefaultAsync();
+
+        if (firstUnpaidPreviousSession is not null)
+        {
+            return new SessionBookingResult(
+                false,
+                $"You must book session #{firstUnpaidPreviousSession.SessionNumber ?? firstUnpaidPreviousSession.Id} first.",
+                StatusCodes.Status422UnprocessableEntity);
+        }
+
+        return new SessionBookingResult(true, null, StatusCodes.Status200OK);
     }
 
     public async Task LeaveAsync(long sessionId, long userId)

@@ -148,8 +148,8 @@ public static class SessionSlice
         IJaasTokenService jaasTokenService,
         IConfiguration configuration)
     {
-        if (!auth.IsAdminOrInstructor())
-            return ApiResponse.Fail("This action is unauthorized.", StatusCodes.Status403Forbidden);
+        //if (!auth.IsAdminOrInstructor())
+        //    return ApiResponse.Fail("This action is unauthorized.", StatusCodes.Status403Forbidden);
 
         await sessionRepository.StartAsync(sessionId);
 

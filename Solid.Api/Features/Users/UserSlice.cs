@@ -68,14 +68,25 @@ public static class UserSlice
         return ApiResponse.Ok(new { user = UserResource.From(user!) }, "Profile updated successfully.");
     }
 
-    private static async Task<IResult> Instructors(IUserRepository userRepository)
+    private static async Task<IResult> Instructors(
+        IUserRepository userRepository,
+        ISettingsRepository settingsRepository)
     {
         var instructors = await userRepository.InstructorsAsync();
+        var sessionPrice = await SessionPriceAsync(settingsRepository);
 
-        return ApiResponse.Ok(new { instructors = instructors.Select(InstructorResource.From) });
+        return ApiResponse.Ok(new
+        {
+            instructors = instructors.Select(instructor => InstructorResource.From(instructor, sessionPrice)),
+            session_price = sessionPrice,
+            formatted_session_price = $"{sessionPrice:0.##} EGP"
+        });
     }
 
-    private static async Task<IResult> ShowInstructor(long userId, IUserRepository userRepository)
+    private static async Task<IResult> ShowInstructor(
+        long userId,
+        IUserRepository userRepository,
+        ISettingsRepository settingsRepository)
     {
         var user = await userRepository.FindAsync(userId);
         if (user is null || user.Role != "instructor")
@@ -83,7 +94,14 @@ public static class UserSlice
             return ApiResponse.Fail("User is not an instructor.", StatusCodes.Status404NotFound);
         }
 
-        return ApiResponse.Ok(new { instructor = InstructorResource.From(user) });
+        var sessionPrice = await SessionPriceAsync(settingsRepository);
+
+        return ApiResponse.Ok(new
+        {
+            instructor = InstructorResource.From(user, sessionPrice),
+            session_price = sessionPrice,
+            formatted_session_price = $"{sessionPrice:0.##} EGP"
+        });
     }
 
     private static async Task<IResult> CreateInstructor(
@@ -129,6 +147,15 @@ public static class UserSlice
             request.preferred_language ?? "ar"));
 
         return ApiResponse.Ok(new { instructor = InstructorResource.From(instructor) }, "Instructor created successfully.");
+    }
+
+    private static async Task<decimal> SessionPriceAsync(ISettingsRepository settingsRepository)
+    {
+        var settingsAmount = await settingsRepository.GetAsync("general", "session_price");
+
+        return decimal.TryParse(settingsAmount, out var sessionPrice)
+            ? sessionPrice
+            : 0;
     }
 }
 

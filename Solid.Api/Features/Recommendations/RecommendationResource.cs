@@ -1,3 +1,4 @@
+using Solid.Api.Common;
 using Solid.Api.Database.Entities;
 
 namespace Solid.Api.Features.Recommendations;
@@ -18,8 +19,8 @@ public static class RecommendationResource
             latitude = recommendation.Latitude,
             longitude = recommendation.Longitude,
             is_active = recommendation.IsActive,
-            created_at = recommendation.CreatedAt,
-            updated_at = recommendation.UpdatedAt
+            created_at = EgyptDateTime.Format(recommendation.CreatedAt),
+            updated_at = EgyptDateTime.Format(recommendation.UpdatedAt)
         };
     }
 }

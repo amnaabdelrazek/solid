@@ -1,3 +1,4 @@
+using Solid.Api.Common;
 using Solid.Api.Database.Entities;
 
 namespace Solid.Api.Features.Groups;
@@ -25,8 +26,8 @@ public static class GroupResource
             min_members = group.MinMembers,
             max_members = group.MaxMembers,
             members_count = group.Members.Count(member => member.IsActive),
-            created_at = group.CreatedAt,
-            updated_at = group.UpdatedAt
+            created_at = EgyptDateTime.Format(group.CreatedAt),
+            updated_at = EgyptDateTime.Format(group.UpdatedAt)
         };
     }
 }

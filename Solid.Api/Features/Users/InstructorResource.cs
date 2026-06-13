@@ -16,8 +16,8 @@ public static class InstructorResource
         {
             id = user.Id,
             display_name = user.DisplayName,
-            phone_number = user.MobileNumber,   // fixed: was PhoneNumber (PascalCase)
-            email = user.Email,                  // fixed: was Email (PascalCase)
+            phone_number = user.MobileNumber,
+            email = user.Email,
             avatar_url = user.AvatarUrl,
             bio = user.Bio,
             experience = JsonPayload.Parse(user.Experience) ?? Array.Empty<object>(),

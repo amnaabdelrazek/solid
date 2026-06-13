@@ -18,9 +18,9 @@ public static class PaymentResource
             gateway = payment.Gateway,
             gateway_transaction_id = payment.GatewayTransactionId,
             gateway_response = JsonPayload.Parse(payment.GatewayResponse),
-            paid_at = payment.PaidAt,
-            created_at = payment.CreatedAt,
-            updated_at = payment.UpdatedAt
+            paid_at = EgyptDateTime.Format(payment.PaidAt),
+            created_at = EgyptDateTime.Format(payment.CreatedAt),
+            updated_at = EgyptDateTime.Format(payment.UpdatedAt)
         };
     }
 }

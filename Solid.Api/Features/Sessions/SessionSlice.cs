@@ -258,13 +258,13 @@ public static class SessionSlice
         id = attendance.Id,
         session_id = attendance.SessionId,
         user_id = attendance.UserId,
-        joined_at = attendance.JoinedAt,
-        left_at = attendance.LeftAt,
+        joined_at = EgyptDateTime.Format(attendance.JoinedAt),
+        left_at = EgyptDateTime.Format(attendance.LeftAt),
         was_present = attendance.WasPresent,
         rating = attendance.Rating,
         comment = attendance.Comment,
-        created_at = attendance.CreatedAt,
-        updated_at = attendance.UpdatedAt
+        created_at = EgyptDateTime.Format(attendance.CreatedAt),
+        updated_at = EgyptDateTime.Format(attendance.UpdatedAt)
     };
 }
 

@@ -78,14 +78,19 @@ public sealed class PaymentRepository(SolidDbContext dbContext) : IPaymentReposi
         await dbContext.SaveChangesAsync();
     }
 
-    public async Task MarkAsPaidAsync(long paymentId, string transactionId)
+    public async Task<Payment?> MarkAsPaidAsync(long paymentId, string transactionId)
     {
         var payment = await dbContext.Payments.FindAsync(paymentId);
-        if (payment is null) return;
+        if (payment is null || payment.Status == "paid")
+        {
+            return null;
+        }
 
         payment.Status = "paid";
         payment.PaidAt = DateTime.UtcNow;
         payment.UpdatedAt = DateTime.UtcNow;
         await dbContext.SaveChangesAsync();
+
+        return payment;
     }
 }

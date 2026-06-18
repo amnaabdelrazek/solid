@@ -15,7 +15,8 @@ public static class UserSlice
         api.MapPut("/profile", UpdateProfile);
         api.MapGet("/instructors", Instructors);
         api.MapGet("/instructors/{userId:long}", ShowInstructor);
-        api.MapPost("/instructors", CreateInstructor);
+        api.MapPost("/instructors", CreateInstructor)
+            .Accepts<CreateInstructorRequest>("application/json", "application/x-www-form-urlencoded", "multipart/form-data");
 
         return api;
     }
@@ -106,9 +107,15 @@ public static class UserSlice
 
     private static async Task<IResult> CreateInstructor(
         IAuthContext auth,
-        [FromBody] CreateInstructorRequest request,
+        HttpRequest httpRequest,
         IUserRepository userRepository)
     {
+        var payload = await RequestPayload.ReadAsync<CreateInstructorRequest>(httpRequest);
+        if (payload.Error is not null)
+            return payload.Error;
+
+        var request = payload.Value!;
+
         if (string.IsNullOrWhiteSpace(request.display_name) ||
             string.IsNullOrWhiteSpace(request.mobile_number) ||
             string.IsNullOrWhiteSpace(request.password))

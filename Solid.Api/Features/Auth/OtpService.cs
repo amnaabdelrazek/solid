@@ -11,7 +11,6 @@ public sealed class OtpService(
     : IOtpService
 {
     public async Task SendRegistrationOtpAsync(
-        long userId,
         string? mobileNumber)
     {
         if (string.IsNullOrWhiteSpace(mobileNumber))
@@ -22,7 +21,7 @@ public sealed class OtpService(
 
         if (TryUseFixedOtp(out var fixedOtp))
         {
-            logger.LogWarning("DEV FIXED OTP for registration user {UserId}: {Otp}", userId, fixedOtp);
+            logger.LogWarning("DEV FIXED OTP for registration mobile {MobileNumber}: {Otp}", mobileNumber, fixedOtp);
 
             return;
         }
@@ -31,17 +30,10 @@ public sealed class OtpService(
     }
 
     public async Task<bool> VerifyRegistrationOtpAsync(
-        long userId,
+        string? mobileNumber,
         string otp)
     {
-        var user = await authRepository.FindUserByIdAsync(userId);
-
-        if (user is null)
-        {
-            return false;
-        }
-
-        if (string.IsNullOrWhiteSpace(user.MobileNumber))
+        if (string.IsNullOrWhiteSpace(mobileNumber))
         {
             return false;
         }
@@ -52,7 +44,7 @@ public sealed class OtpService(
         }
 
         return await smsSender.VerifyOtpAsync(
-            user.MobileNumber,
+            mobileNumber,
             otp);
     }
 

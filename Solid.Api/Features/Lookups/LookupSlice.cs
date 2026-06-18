@@ -16,8 +16,12 @@ public static class LookupSlice
 
         // Protected - require auth
         api.MapGet("/lookups", AllLookupTypes).RequireAuthorization();
-        api.MapPost("/lookups", CreateLookupType).RequireAuthorization();
-        api.MapPost("/lookups/{type}/values", AddLookupValue).RequireAuthorization();
+        api.MapPost("/lookups", CreateLookupType)
+            .Accepts<CreateLookupTypeRequest>("application/json", "application/x-www-form-urlencoded", "multipart/form-data")
+            .RequireAuthorization();
+        api.MapPost("/lookups/{type}/values", AddLookupValue)
+            .Accepts<CreateLookupValueRequest>("application/json", "application/x-www-form-urlencoded", "multipart/form-data")
+            .RequireAuthorization();
         api.MapPut("/lookups/{type}/values/{valueId:long}", UpdateLookupValue).RequireAuthorization();
         api.MapDelete("/lookups/{type}/values/{valueId:long}", DeleteLookupValue).RequireAuthorization();
 
@@ -55,9 +59,15 @@ public static class LookupSlice
     // POST /api/lookups — create new lookup type
     private static async Task<IResult> CreateLookupType(
         IAuthContext auth,
-        [FromBody] CreateLookupTypeRequest request,
+        HttpRequest httpRequest,
         ILookupRepository lookupRepository)
     {
+        var payload = await RequestPayload.ReadAsync<CreateLookupTypeRequest>(httpRequest);
+        if (payload.Error is not null)
+            return payload.Error;
+
+        var request = payload.Value!;
+
         if (string.IsNullOrWhiteSpace(request.key) || string.IsNullOrWhiteSpace(request.label_ar))
             return ApiResponse.Fail("Key and label_ar are required.", StatusCodes.Status422UnprocessableEntity);
 
@@ -83,9 +93,15 @@ public static class LookupSlice
     private static async Task<IResult> AddLookupValue(
         string type,
         IAuthContext auth,
-        [FromBody] CreateLookupValueRequest request,
+        HttpRequest httpRequest,
         ILookupRepository lookupRepository)
     {
+        var payload = await RequestPayload.ReadAsync<CreateLookupValueRequest>(httpRequest);
+        if (payload.Error is not null)
+            return payload.Error;
+
+        var request = payload.Value!;
+
         var lookupType = await lookupRepository.LookupTypeAsync(type);
         if (lookupType is null)
             return ApiResponse.Fail("Lookup type not found.", StatusCodes.Status404NotFound);

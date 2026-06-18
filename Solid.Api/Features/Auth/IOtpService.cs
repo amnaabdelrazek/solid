@@ -2,9 +2,9 @@ namespace Solid.Api.Features.Auth;
 
 public interface IOtpService
 {
-    Task SendRegistrationOtpAsync(long userId, string? mobileNumber);
+    Task SendRegistrationOtpAsync(string? mobileNumber);
 
-    Task<bool> VerifyRegistrationOtpAsync(long userId, string otp);
+    Task<bool> VerifyRegistrationOtpAsync(string? mobileNumber, string otp);
 
     Task SendPasswordResetOtpAsync(long userId, string? mobileNumber);
 

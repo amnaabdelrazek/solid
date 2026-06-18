@@ -10,7 +10,8 @@ public static class RecommendationSlice
     public static IEndpointRouteBuilder MapRecommendationSlice(this IEndpointRouteBuilder api)
     {
         api.MapGet("/recommendations", Index);
-        api.MapPost("/recommendations", Create);
+        api.MapPost("/recommendations", Create)
+            .Accepts<CreateRecommendationRequest>("application/json", "application/x-www-form-urlencoded", "multipart/form-data");
         api.MapPut("/recommendations/{id:long}", Update);
         api.MapDelete("/recommendations/{id:long}", Delete);
 
@@ -27,10 +28,16 @@ public static class RecommendationSlice
     // POST /api/recommendations - user creates recommendation (must be member of the session)
     private static async Task<IResult> Create(
         IAuthContext auth,
-        [FromBody] CreateRecommendationRequest request,
+        HttpRequest httpRequest,
         IRecommendationRepository recommendationRepository,
         ISessionRepository sessionRepository)
     {
+        var payload = await RequestPayload.ReadAsync<CreateRecommendationRequest>(httpRequest);
+        if (payload.Error is not null)
+            return payload.Error;
+
+        var request = payload.Value!;
+
         if (string.IsNullOrWhiteSpace(request.name_ar))
             return ApiResponse.Fail("name_ar is required.", StatusCodes.Status422UnprocessableEntity);
 

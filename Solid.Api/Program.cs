@@ -81,6 +81,7 @@ builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
 builder.Services.AddScoped<IRecommendationRepository, RecommendationRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IOtpService, OtpService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
 
 // ✅ JaaS token service
 builder.Services.AddScoped<IJaasTokenService, JaasTokenService>();

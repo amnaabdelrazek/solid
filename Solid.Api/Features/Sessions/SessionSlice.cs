@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Solid.Api.Common;
 using Solid.Api.Database.Entities;
 using Solid.Api.Database.Repositories;
+using Solid.Api.Features.Notifications;
 using Solid.Api.Infrastructure.Auth;
 using Solid.Api.Infrastructure.Jitsi;
 using Stripe;
@@ -13,7 +14,8 @@ public static class SessionSlice
     public static IEndpointRouteBuilder MapSessionSlice(this IEndpointRouteBuilder api)
     {
         api.MapGet("/sessions", Index);
-        api.MapPost("/sessions", Create);
+        api.MapPost("/sessions", Create)
+            .Accepts<CreateSessionRequest>("application/json", "application/x-www-form-urlencoded", "multipart/form-data");
         api.MapGet("/sessions/upcoming", Upcoming);
         api.MapGet("/sessions/upcoming/unpaid", UpcomingUnpaid);
         api.MapGet("/sessions/me", Upcoming);
@@ -22,7 +24,8 @@ public static class SessionSlice
         api.MapPost("/sessions/{sessionId:long}/leave", Leave);
         api.MapPost("/sessions/{sessionId:long}/start", Start);
         api.MapPost("/sessions/{sessionId:long}/end", End);
-        api.MapPost("/sessions/{sessionId:long}/feedback", Feedback);
+        api.MapPost("/sessions/{sessionId:long}/feedback", Feedback)
+            .Accepts<FeedbackRequest>("application/json", "application/x-www-form-urlencoded", "multipart/form-data");
 
         return api;
     }
@@ -37,9 +40,16 @@ public static class SessionSlice
 
     private static async Task<IResult> Create(
         IAuthContext auth,
-        [FromBody] CreateSessionRequest request,
-        ISessionRepository sessionRepository)
+        HttpRequest httpRequest,
+        ISessionRepository sessionRepository,
+        INotificationService notificationService)
     {
+        var payload = await RequestPayload.ReadAsync<CreateSessionRequest>(httpRequest);
+        if (payload.Error is not null)
+            return payload.Error;
+
+        var request = payload.Value!;
+
         if (request.group_id <= 0 || request.scheduled_at == default)
             return ApiResponse.Fail("The given data was invalid.", StatusCodes.Status422UnprocessableEntity);
 
@@ -48,19 +58,34 @@ public static class SessionSlice
         if (instructorId is null or <= 0)
             return ApiResponse.Fail("Instructor is required.", StatusCodes.Status422UnprocessableEntity);
 
+        var scheduledAtUtc = EgyptDateTime.ToUtcFromEgyptClock(request.scheduled_at);
+
         var result = await sessionRepository.CreateAsync(new SessionCreate(
             request.group_id,
             instructorId.Value,
             request.session_number,
             request.title,
             request.session_type ?? "group",
-            request.scheduled_at,
+            scheduledAtUtc,
             request.duration_minutes ?? 45,
             request.max_participants,
             request.metadata));
 
         if (result.Session is null)
             return ApiResponse.Fail(result.Error ?? "Unable to create session.", result.StatusCode);
+
+        await notificationService.NotifyUsersAsync(
+            SessionRecipients(result.Session, includeInstructor: true),
+            "SessionCreated",
+            "New session",
+            $"Session #{result.Session.SessionNumber ?? result.Session.Id} has been scheduled.",
+            "calendar",
+            new
+            {
+                session_id = result.Session.Id,
+                group_id = result.Session.GroupId,
+                scheduled_at = EgyptDateTime.Format(result.Session.ScheduledAt)
+            });
 
         return ApiResponse.Ok(
             new { session = SessionResource.From(result.Session) },
@@ -92,13 +117,16 @@ public static class SessionSlice
     private static async Task<IResult> Show(
         long sessionId,
         IAuthContext auth,
-        ISessionRepository sessionRepository)
+        ISessionRepository sessionRepository,
+        ISettingsRepository settingsRepository)
     {
         var session = await sessionRepository.FindAsync(sessionId, auth.UserId, auth.Role);
+        var settingsAmount = await settingsRepository.GetAsync("general", "session_price");
+        decimal.TryParse(settingsAmount, out var price);
 
         return session is null
             ? ApiResponse.Fail("Not found.", StatusCodes.Status404NotFound)
-            : ApiResponse.Ok(new { session = SessionResource.From(session) });
+            : ApiResponse.Ok(new { session = SessionResource.From(session, price) });
     }
 
     // ── JOIN ─────────────────────────────────────────────────────────────────
@@ -155,7 +183,8 @@ public static class SessionSlice
         ISessionRepository sessionRepository,
         IUserRepository userRepository,
         IJaasTokenService jaasTokenService,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        INotificationService notificationService)
     {
         //if (!auth.IsAdminOrInstructor())
         //    return ApiResponse.Fail("This action is unauthorized.", StatusCodes.Status403Forbidden);
@@ -165,6 +194,18 @@ public static class SessionSlice
         var session = await sessionRepository.FindAnyAsync(sessionId);
         if (session is null)
             return ApiResponse.Fail("Not found.", StatusCodes.Status404NotFound);
+
+        await notificationService.NotifyUsersAsync(
+            SessionRecipients(session, includeInstructor: false),
+            "SessionStarted",
+            "Session started",
+            $"Session #{session.SessionNumber ?? session.Id} has started.",
+            "video",
+            new
+            {
+                session_id = session.Id,
+                group_id = session.GroupId
+            });
 
         var user = await userRepository.FindAsync(auth.UserId);
 
@@ -207,9 +248,15 @@ public static class SessionSlice
     private static async Task<IResult> Feedback(
         long sessionId,
         IAuthContext auth,
-        [FromBody] FeedbackRequest request,
+        HttpRequest httpRequest,
         ISessionRepository sessionRepository)
     {
+        var payload = await RequestPayload.ReadAsync<FeedbackRequest>(httpRequest);
+        if (payload.Error is not null)
+            return payload.Error;
+
+        var request = payload.Value!;
+
         if (request.rating is < 1 or > 5)
             return ApiResponse.Fail("Rating must be between 1 and 5.", StatusCodes.Status422UnprocessableEntity);
 
@@ -275,6 +322,17 @@ public static class SessionSlice
         created_at = EgyptDateTime.Format(attendance.CreatedAt),
         updated_at = EgyptDateTime.Format(attendance.UpdatedAt)
     };
+
+    private static IEnumerable<long> SessionRecipients(TherapySession session, bool includeInstructor)
+    {
+        var memberIds = session.Group.Members
+            .Where(member => member.IsActive)
+            .Select(member => member.UserId);
+
+        return includeInstructor
+            ? memberIds.Append(session.InstructorId)
+            : memberIds;
+    }
 }
 
 public sealed record CreateSessionRequest(

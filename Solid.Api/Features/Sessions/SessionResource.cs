@@ -14,8 +14,11 @@ public static class SessionResource
         {
             id = session.Id,
             group_id = session.GroupId,
+            group_name = session.Group?.NameAr,
+            group_name_ar = session.Group?.NameAr,
+            group_name_en = session.Group?.NameEn,
             instructor_id = session.InstructorId,
-            instructor_name = session.Instructor?.DisplayName,   // ADD THIS
+            instructor_name = session.Instructor?.DisplayName,
             session_number = session.SessionNumber,
             title = string.IsNullOrWhiteSpace(title) ? $"Session {session.SessionNumber}" : title,
             session_type = session.SessionType,

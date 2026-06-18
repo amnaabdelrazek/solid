@@ -1,5 +1,5 @@
-using System.Security.Claims;
-using System.IdentityModel.Tokens.Jwt;
+using Microsoft.Extensions.Caching.Memory;
+using Solid.Api.Common;
 using Solid.Api.Database;
 using Solid.Api.Database.Repositories;
 using Solid.Api.Features.Shared;
@@ -12,11 +12,18 @@ public sealed class AuthService(
     IAuthRepository authRepository,
     IJwtTokenService jwtTokenService,
     ICacheRepository cacheRepository,
-    IOtpService otpService) : IAuthService
+    IGroupRepository groupRepository,
+    IOtpService otpService,
+    IMemoryCache memoryCache,
+    IConfiguration configuration) : IAuthService
 {
     public async Task<AuthPayload> RegisterAsync(RegisterRequest request)
     {
-        await using var transaction = await dbContext.Database.BeginTransactionAsync();
+        var existingUser = await authRepository.FindUserByMobileAsync(request.mobile_number);
+        if (existingUser is not null)
+        {
+            throw new InvalidOperationException("Mobile number already exists.");
+        }
 
         var create = new AuthUserCreate(
             request.display_name,
@@ -31,39 +38,40 @@ public sealed class AuthService(
             request.addiction_reason,
             request.days_clean);
 
-        var user = await authRepository.FindUserByMobileAsync(request.mobile_number);
-        if (user is null)
-        {
-            user = await authRepository.CreateInactiveUserAsync(create);
-        }
-        else
-        {
-            if (!await authRepository.HasAddictionProfileAsync(user.Id))
-            {
-                await authRepository.CompleteRegistrationDetailsAsync(user.Id, create);
-                user = (await authRepository.FindUserByIdAsync(user.Id))!;
-            }
-        }
+        await otpService.SendRegistrationOtpAsync(create.MobileNumber);
 
-        await otpService.SendRegistrationOtpAsync(user.Id, user.MobileNumber);
+        var token = Hashing.RandomToken(32);
+        memoryCache.Set(PendingRegistrationCacheKey(token), create, PendingRegistrationTtl());
 
-        var token = jwtTokenService.Create(user.Id, user.Role, "register");
-        await transaction.CommitAsync();
-
-        return new AuthPayload(UserResource.From(user), token);
+        return new AuthPayload(PendingUserResource(create), token);
     }
 
     public async Task VerifyAsync(string token, string otp)
     {
-        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
-        var userId = Convert.ToInt64(jwt.Claims.First(claim => claim.Type == ClaimTypes.NameIdentifier || claim.Type == "nameid").Value);
-
-        if (!await otpService.VerifyRegistrationOtpAsync(userId, otp))
+        if (!memoryCache.TryGetValue<AuthUserCreate>(PendingRegistrationCacheKey(token), out var create) ||
+            create is null)
         {
             throw new InvalidOperationException("Invalid OTP.");
         }
 
-        await authRepository.ActivateUserAsync(userId);
+        if (!await otpService.VerifyRegistrationOtpAsync(create.MobileNumber, otp))
+        {
+            throw new InvalidOperationException("Invalid OTP.");
+        }
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync();
+
+        if (await authRepository.FindUserByMobileAsync(create.MobileNumber) is not null)
+        {
+            throw new InvalidOperationException("Mobile number already exists.");
+        }
+
+        var user = await authRepository.CreateInactiveUserAsync(create);
+        await authRepository.ActivateUserAsync(user.Id);
+        await SubscribeUserToGroupAsync(user.Id);
+
+        await transaction.CommitAsync();
+        memoryCache.Remove(PendingRegistrationCacheKey(token));
     }
 
     public async Task<AuthPayload?> LoginAsync(LoginRequest request)
@@ -125,5 +133,48 @@ public sealed class AuthService(
     public async Task DeleteAccountAsync(long userId)
     {
         await authRepository.DeactivateAccountAsync(userId);
+    }
+
+    private static string PendingRegistrationCacheKey(string token)
+    {
+        return $"pending_registration:{token}";
+    }
+
+    private TimeSpan PendingRegistrationTtl()
+    {
+        var seconds = int.TryParse(configuration["Otp:TtlSeconds"], out var configuredTtl)
+            ? configuredTtl
+            : 300;
+
+        return TimeSpan.FromSeconds(seconds);
+    }
+
+    private static object PendingUserResource(AuthUserCreate create)
+    {
+        return new
+        {
+            id = (long?)null,
+            display_name = create.DisplayName,
+            mobile_number = create.MobileNumber,
+            role = "addict",
+            preferred_language = create.PreferredLanguage,
+            is_active = false
+        };
+    }
+
+    private async Task SubscribeUserToGroupAsync(long userId)
+    {
+        if (await groupRepository.HasActiveMembershipAsync(userId))
+        {
+            return;
+        }
+
+        var group = await groupRepository.FindOrCreateForUserSubstanceAsync(userId);
+        if (group is null)
+        {
+            return;
+        }
+
+        await groupRepository.AddMemberAsync(group.Id, userId);
     }
 }

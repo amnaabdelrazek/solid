@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Solid.Api.Common;
 using Solid.Api.Database.Repositories;
+using Solid.Api.Features.Notifications;
 using Solid.Api.Infrastructure.Auth;
 using Stripe;
 using Stripe.Checkout;
@@ -15,7 +16,8 @@ public static class PaymentSlice
         api.MapGet("/payments/success", Success).AllowAnonymous();
         api.MapGet("/payments/cancel", Cancel).AllowAnonymous();
         api.MapGet("/payments/history", History);
-        api.MapPost("/payment-methods", StorePaymentMethod);
+        api.MapPost("/payment-methods", StorePaymentMethod)
+            .Accepts<PaymentMethodRequest>("application/json", "application/x-www-form-urlencoded", "multipart/form-data");
         api.MapGet("/payment-methods", PaymentMethods);
         api.MapPost("/payments/webhook/stripe", WebhookStripe).AllowAnonymous();
 
@@ -94,7 +96,8 @@ public static class PaymentSlice
         [FromQuery] long paymentId,
         [FromQuery(Name = "session_id")] string? checkoutSessionId,
         IPaymentRepository paymentRepository,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        INotificationService notificationService)
     {
         if (string.IsNullOrWhiteSpace(checkoutSessionId))
             return ApiResponse.Fail("Checkout session is required.", StatusCodes.Status422UnprocessableEntity);
@@ -126,7 +129,11 @@ public static class PaymentSlice
             return ApiResponse.Fail("Payment session mismatch.", StatusCodes.Status422UnprocessableEntity);
         }
 
-        await paymentRepository.MarkAsPaidAsync(paymentId, checkoutSession.Id);
+        var paidPayment = await paymentRepository.MarkAsPaidAsync(paymentId, checkoutSession.Id);
+        if (paidPayment is not null)
+        {
+            await NotifyPaymentPaidAsync(notificationService, paidPayment);
+        }
 
         return ApiResponse.Ok(message: "Payment completed successfully.");
     }
@@ -139,7 +146,8 @@ public static class PaymentSlice
     private static async Task<IResult> WebhookStripe(
         HttpRequest request,
         IPaymentRepository paymentRepository,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        INotificationService notificationService)
     {
         var json = await new StreamReader(request.Body).ReadToEndAsync();
 
@@ -162,9 +170,11 @@ public static class PaymentSlice
                 if (session?.Metadata.TryGetValue("payment_id", out var paymentIdStr) == true
                     && long.TryParse(paymentIdStr, out var paymentId))
                 {
-                    var payments = await paymentRepository.HistoryAsync(0); // just used to check existence
-                    // Mark as paid only if payment exists
-                    await paymentRepository.MarkAsPaidAsync(paymentId, session.Id);
+                    var paidPayment = await paymentRepository.MarkAsPaidAsync(paymentId, session.Id);
+                    if (paidPayment is not null)
+                    {
+                        await NotifyPaymentPaidAsync(notificationService, paidPayment);
+                    }
                 }
             }
             else if (stripeEvent.Type == "payment_intent.succeeded")
@@ -173,7 +183,11 @@ public static class PaymentSlice
                 if (paymentIntent?.Metadata.TryGetValue("payment_id", out var paymentIdStr) == true
                     && long.TryParse(paymentIdStr, out var paymentId))
                 {
-                    await paymentRepository.MarkAsPaidAsync(paymentId, paymentIntent.Id);
+                    var paidPayment = await paymentRepository.MarkAsPaidAsync(paymentId, paymentIntent.Id);
+                    if (paidPayment is not null)
+                    {
+                        await NotifyPaymentPaidAsync(notificationService, paidPayment);
+                    }
                 }
             }
 
@@ -193,9 +207,15 @@ public static class PaymentSlice
 
     private static async Task<IResult> StorePaymentMethod(
         IAuthContext auth,
-        [FromBody] PaymentMethodRequest request,
+        HttpRequest httpRequest,
         IPaymentRepository paymentRepository)
     {
+        var payload = await RequestPayload.ReadAsync<PaymentMethodRequest>(httpRequest);
+        if (payload.Error is not null)
+            return payload.Error;
+
+        var request = payload.Value!;
+
         if (string.IsNullOrWhiteSpace(request.card_holder))
             return ApiResponse.Fail("card_holder is required.", StatusCodes.Status422UnprocessableEntity);
 
@@ -229,6 +249,23 @@ public static class PaymentSlice
         }
 
         return $"{request.Scheme}://{request.Host}".TrimEnd('/');
+    }
+
+    private static Task NotifyPaymentPaidAsync(INotificationService notificationService, Database.Entities.Payment payment)
+    {
+        return notificationService.NotifyUsersAsync(
+            [payment.UserId],
+            "SessionPaid",
+            "Payment successful",
+            $"Your session payment of {payment.Amount:0.##} {payment.Currency} was successful.",
+            "credit-card",
+            new
+            {
+                payment_id = payment.Id,
+                session_id = payment.SessionId,
+                amount = payment.Amount,
+                currency = payment.Currency
+            });
     }
 }
 

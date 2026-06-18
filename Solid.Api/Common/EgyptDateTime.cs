@@ -32,6 +32,13 @@ public static class EgyptDateTime
         return ToEgyptTime(value).ToString(TimeFormat, Culture);
     }
 
+    public static DateTime ToUtcFromEgyptClock(DateTime value)
+    {
+        var egyptClock = DateTime.SpecifyKind(value, DateTimeKind.Unspecified);
+
+        return TimeZoneInfo.ConvertTimeToUtc(egyptClock, TimeZone);
+    }
+
     private static DateTime ToEgyptTime(DateTime value)
     {
         var utcValue = value.Kind == DateTimeKind.Utc

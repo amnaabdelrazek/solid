@@ -13,11 +13,16 @@ public static class AuthSlice
         var auth = api.MapGroup("/auth");
 
         auth.MapPost("/register", Register);
-        auth.MapPost("/verify", Verify);
-        auth.MapPost("/login", Login);
-        auth.MapPost("/forgot-password", ForgotPassword);
-        auth.MapPost("/verify-forgot-otp", VerifyForgotOtp);
-        auth.MapPost("/reset-password", ResetPassword);
+        auth.MapPost("/verify", Verify)
+            .Accepts<VerifyOtpRequest>("application/json", "application/x-www-form-urlencoded", "multipart/form-data");
+        auth.MapPost("/login", Login)
+            .Accepts<LoginRequest>("application/json", "application/x-www-form-urlencoded", "multipart/form-data");
+        auth.MapPost("/forgot-password", ForgotPassword)
+            .Accepts<ForgotPasswordRequest>("application/json", "application/x-www-form-urlencoded", "multipart/form-data");
+        auth.MapPost("/verify-forgot-otp", VerifyForgotOtp)
+            .Accepts<VerifyForgotOtpRequest>("application/json", "application/x-www-form-urlencoded", "multipart/form-data");
+        auth.MapPost("/reset-password", ResetPassword)
+            .Accepts<ResetPasswordRequest>("application/json", "application/x-www-form-urlencoded", "multipart/form-data");
 
         var protectedAuth = auth.MapGroup("");
         protectedAuth.RequireLaravelSanctum();
@@ -28,8 +33,14 @@ public static class AuthSlice
         return api;
     }
 
-    private static async Task<IResult> Register([FromBody] RegisterRequest request, IAuthService authService, ILookupRepository lookupRepository)
+    private static async Task<IResult> Register(HttpRequest httpRequest, IAuthService authService, ILookupRepository lookupRepository)
     {
+        var requestPayload = await RequestPayload.ReadAsync<RegisterRequest>(httpRequest);
+        if (requestPayload.Error is not null)
+            return requestPayload.Error;
+
+        var request = requestPayload.Value!;
+
         if (string.IsNullOrWhiteSpace(request.display_name) ||
             string.IsNullOrWhiteSpace(request.mobile_number) ||
             string.IsNullOrWhiteSpace(request.password) ||
@@ -102,8 +113,13 @@ public static class AuthSlice
         return null;
     }
 
-    private static async Task<IResult> Verify(HttpRequest httpRequest, [FromBody] VerifyOtpRequest request, IAuthService authService)
+    private static async Task<IResult> Verify(HttpRequest httpRequest, IAuthService authService)
     {
+        var payload = await RequestPayload.ReadAsync<VerifyOtpRequest>(httpRequest);
+        if (payload.Error is not null)
+            return payload.Error;
+
+        var request = payload.Value!;
         var token = httpRequest.Headers.Authorization.FirstOrDefault()?.Replace("Bearer ", "", StringComparison.OrdinalIgnoreCase);
         if (string.IsNullOrWhiteSpace(token))
         {
@@ -125,7 +141,7 @@ public static class AuthSlice
         return ApiResponse.Ok(message: "Registration successful.");
     }
 
-    //private static async Task<IResult> Login([FromBody] LoginRequest request, IAuthService authService)
+    //private static async Task<IResult> Login(LoginRequest request, IAuthService authService)
     //{
     //    if (string.IsNullOrWhiteSpace(request.mobile_number) || string.IsNullOrWhiteSpace(request.password))
     //        return ApiResponse.Fail("Mobile number and password are required.", StatusCodes.Status422UnprocessableEntity);
@@ -147,33 +163,17 @@ public static class AuthSlice
     //}
 
 
-    private static async Task<IResult> Login(HttpContext httpContext, IAuthService authService)
+    private static async Task<IResult> Login(HttpRequest httpRequest, IAuthService authService)
     {
-        LoginRequest request;
+        var requestPayload = await RequestPayload.ReadAsync<LoginRequest>(httpRequest);
+        if (requestPayload.Error is not null)
+            return requestPayload.Error;
 
-        if (httpContext.Request.HasJsonContentType())
-        {
-            request = await httpContext.Request.ReadFromJsonAsync<LoginRequest>();
-            if(request==null)
-                 return ApiResponse.Fail("Invalid request body.", StatusCodes.Status422UnprocessableEntity);
-        }
-        else if (httpContext.Request.HasFormContentType)
-        {
-            var form = await httpContext.Request.ReadFormAsync();
-            request = new LoginRequest(
-                form["mobile_number"].FirstOrDefault() ?? string.Empty,
-                form["password"].FirstOrDefault() ?? string.Empty,
-                form["device_id"].FirstOrDefault() ?? string.Empty);
-        }
-        else
-        {
-            return ApiResponse.Fail("Unsupported content type.", StatusCodes.Status415UnsupportedMediaType);
-        }
+        var request = requestPayload.Value!;
 
         if (string.IsNullOrWhiteSpace(request.mobile_number) || string.IsNullOrWhiteSpace(request.password))
             return ApiResponse.Fail("Mobile number and password are required.", StatusCodes.Status422UnprocessableEntity);
 
-        // rest of your existing logic...
         if (!PhoneNumberValidator.TryNormalize(request.mobile_number, out var normalizedMobileNumber))
             return ApiResponse.Fail(PhoneNumberValidator.Message, StatusCodes.Status422UnprocessableEntity);
 
@@ -186,8 +186,14 @@ public static class AuthSlice
         return ApiResponse.Ok(new { token = payload.Token, token_type = payload.TokenType, user = payload.User });
     }
 
-    private static async Task<IResult> ForgotPassword([FromBody] ForgotPasswordRequest request, IAuthService authService)
+    private static async Task<IResult> ForgotPassword(HttpRequest httpRequest, IAuthService authService)
     {
+        var payload = await RequestPayload.ReadAsync<ForgotPasswordRequest>(httpRequest);
+        if (payload.Error is not null)
+            return payload.Error;
+
+        var request = payload.Value!;
+
         if (string.IsNullOrWhiteSpace(request.mobile_number))
             return ApiResponse.Fail("Mobile number is required.", StatusCodes.Status422UnprocessableEntity);
 
@@ -216,8 +222,14 @@ public static class AuthSlice
         return ApiResponse.Ok(new { token }, "OTP has been sent to your mobile number.");
     }
 
-    private static async Task<IResult> VerifyForgotOtp([FromBody] VerifyForgotOtpRequest request, IAuthService authService)
+    private static async Task<IResult> VerifyForgotOtp(HttpRequest httpRequest, IAuthService authService)
     {
+        var payload = await RequestPayload.ReadAsync<VerifyForgotOtpRequest>(httpRequest);
+        if (payload.Error is not null)
+            return payload.Error;
+
+        var request = payload.Value!;
+
         if (string.IsNullOrWhiteSpace(request.token) || string.IsNullOrWhiteSpace(request.otp))
             return ApiResponse.Fail("Token and OTP are required.", StatusCodes.Status422UnprocessableEntity);
 
@@ -230,8 +242,14 @@ public static class AuthSlice
         return ApiResponse.Ok(new { reset_token = resetToken }, "OTP verified successfully.");
     }
 
-    private static async Task<IResult> ResetPassword([FromBody] ResetPasswordRequest request, IAuthService authService)
+    private static async Task<IResult> ResetPassword(HttpRequest httpRequest, IAuthService authService)
     {
+        var payload = await RequestPayload.ReadAsync<ResetPasswordRequest>(httpRequest);
+        if (payload.Error is not null)
+            return payload.Error;
+
+        var request = payload.Value!;
+
         if (string.IsNullOrWhiteSpace(request.reset_token) || string.IsNullOrWhiteSpace(request.password))
             return ApiResponse.Fail("Reset token and password are required.", StatusCodes.Status422UnprocessableEntity);
 
@@ -277,6 +295,7 @@ public static class AuthSlice
     private static IResult SmsFailure(InvalidOperationException exception)
     {
         var statusCode = exception.Message.Contains("phone number", StringComparison.OrdinalIgnoreCase) ||
+                         exception.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase) ||
                          exception.Message.Contains("E.164", StringComparison.OrdinalIgnoreCase) ||
                          exception.Message.Contains("SMS provider rejected", StringComparison.OrdinalIgnoreCase) ||
                          exception.Message.StartsWith("SMS is not configured", StringComparison.OrdinalIgnoreCase)

@@ -339,6 +339,7 @@ public sealed class SessionRepository(SolidDbContext dbContext) : ISessionReposi
         return dbContext.TherapySessions
             .AsNoTracking()
             .Include(session => session.Group.Members)
+            .Include(session => session.Instructor)
             .Include(session => session.Attendances)
             .Where(session => session.DeletedAt == null)
             /*.Where(session => session.Status != "finished")*/;

@@ -1,11 +1,9 @@
 using Solid.Api.Common;
 using Solid.Api.Database.Entities;
 
-namespace Solid.Api.Features.Sessions;
-
 public static class SessionResource
 {
-    public static object From(TherapySession session)
+    public static object From(TherapySession session, decimal price = 0)
     {
         var metadata = JsonPayload.ParseObject(session.SessionMetadata);
         var title = Convert.ToString(metadata.GetValueOrDefault("title"));
@@ -17,6 +15,7 @@ public static class SessionResource
             id = session.Id,
             group_id = session.GroupId,
             instructor_id = session.InstructorId,
+            instructor_name = session.Instructor?.DisplayName,   // ADD THIS
             session_number = session.SessionNumber,
             title = string.IsNullOrWhiteSpace(title) ? $"Session {session.SessionNumber}" : title,
             session_type = session.SessionType,
@@ -38,8 +37,8 @@ public static class SessionResource
             is_full = int.TryParse(maxParticipants, out var fullMaxParticipants)
                 ? currentParticipants >= fullMaxParticipants
                 : session.Group is not null && currentParticipants >= session.Group.MaxMembers,
-            price = 0,
-            formatted_price = "0 EGP",
+            price = price,                              // USE PARAM
+            formatted_price = $"{price:0.##} EGP",     // USE PARAM
             created_at = EgyptDateTime.Format(session.CreatedAt),
             updated_at = EgyptDateTime.Format(session.UpdatedAt),
             is_booked = false,

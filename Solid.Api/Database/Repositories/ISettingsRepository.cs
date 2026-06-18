@@ -8,5 +8,7 @@ public interface ISettingsRepository
 
     Task SetAsync(string group, string name, object? value);
 
+    Task SetRawAsync(string group, string name, string value);
+
     Task<IReadOnlyList<Notification>> NotificationsAsync(long userId);
 }

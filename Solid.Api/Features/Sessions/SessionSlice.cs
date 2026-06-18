@@ -4,6 +4,7 @@ using Solid.Api.Database.Entities;
 using Solid.Api.Database.Repositories;
 using Solid.Api.Infrastructure.Auth;
 using Solid.Api.Infrastructure.Jitsi;
+using Stripe;
 
 namespace Solid.Api.Features.Sessions;
 
@@ -26,10 +27,12 @@ public static class SessionSlice
         return api;
     }
 
-    private static async Task<IResult> Index(IAuthContext auth, ISessionRepository sessionRepository)
+    private static async Task<IResult> Index(IAuthContext auth, ISessionRepository sessionRepository, ISettingsRepository settingsRepository)
     {
         var sessions = await sessionRepository.ListForUserAsync(auth.UserId, auth.Role);
-        return ApiResponse.Ok(new { sessions = sessions.Select(SessionResource.From) });
+        var settingsAmount = await settingsRepository.GetAsync("general", "session_price");
+        decimal.TryParse(settingsAmount, out var price);
+        return ApiResponse.Ok(new { sessions = sessions.Select(s => SessionResource.From(s, price)) });
     }
 
     private static async Task<IResult> Create(
@@ -65,19 +68,25 @@ public static class SessionSlice
     }
 
     private static async Task<IResult> Upcoming(
-        IAuthContext auth,
-        ISessionRepository sessionRepository)
+    IAuthContext auth,
+    ISessionRepository sessionRepository,
+    ISettingsRepository settingsRepository)   // ADD THIS
     {
         var sessions = await sessionRepository.UpcomingPaidForUserAsync(auth.UserId);
-        return ApiResponse.Ok(new { sessions = sessions.Select(SessionResource.From) });
+        var settingsAmount = await settingsRepository.GetAsync("general", "session_price");
+        decimal.TryParse(settingsAmount, out var price);
+        return ApiResponse.Ok(new { sessions = sessions.Select(s => SessionResource.From(s, price)) });
     }
 
     private static async Task<IResult> UpcomingUnpaid(
         IAuthContext auth,
-        ISessionRepository sessionRepository)
+        ISessionRepository sessionRepository,
+        ISettingsRepository settingsRepository)   // ADD THIS
     {
         var sessions = await sessionRepository.UpcomingUnpaidForUserAsync(auth.UserId);
-        return ApiResponse.Ok(new { sessions = sessions.Select(SessionResource.From) });
+        var settingsAmount = await settingsRepository.GetAsync("general", "session_price");
+        decimal.TryParse(settingsAmount, out var price);
+        return ApiResponse.Ok(new { sessions = sessions.Select(s => SessionResource.From(s, price)) });
     }
 
     private static async Task<IResult> Show(

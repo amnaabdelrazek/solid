@@ -43,6 +43,33 @@ public sealed class SettingsRepository(SolidDbContext dbContext) : ISettingsRepo
         await dbContext.SaveChangesAsync();
     }
 
+    public async Task SetRawAsync(string group, string name, string value)
+    {
+        var setting = await dbContext.Settings
+            .FirstOrDefaultAsync(setting => setting.Group == group && setting.Name == name);
+
+        var now = DateTime.UtcNow;
+        if (setting is null)
+        {
+            dbContext.Settings.Add(new Setting
+            {
+                Group = group,
+                Name = name,
+                Locked = false,
+                Payload = value,
+                CreatedAt = now,
+                UpdatedAt = now
+            });
+        }
+        else
+        {
+            setting.Payload = value;
+            setting.UpdatedAt = now;
+        }
+
+        await dbContext.SaveChangesAsync();
+    }
+
     public async Task<IReadOnlyList<Notification>> NotificationsAsync(long userId)
     {
         return await dbContext.Notifications

@@ -20,7 +20,7 @@ public static class InstructorResource
             email = user.Email,
             avatar_url = user.AvatarUrl,
             bio = user.Bio,
-            experience = JsonPayload.Parse(user.Experience) ?? Array.Empty<object>(),
+            experience = user.Experience ?? string.Empty,
             quote = user.Quote,
             session_price = sessionPrice,
             formatted_session_price = sessionPrice is null ? null : $"{sessionPrice:0.##} EGP"

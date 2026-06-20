@@ -36,12 +36,17 @@ builder.Services.AddSwaggerGen(options =>
         In = ParameterLocation.Header,
         Description = "Enter: Bearer {your token}"
     });
+
     options.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
             new OpenApiSecurityScheme
             {
-                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
             },
             Array.Empty<string>()
         }
@@ -49,27 +54,72 @@ builder.Services.AddSwaggerGen(options =>
 });
 #endregion
 
+#region Core Services
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSignalR();
+builder.Services.AddHttpClient();
+#endregion
 
-// SMS provider
-if (builder.Configuration["Sms:Provider"]?.Equals("Twilio", StringComparison.OrdinalIgnoreCase) == true)
-    builder.Services.AddScoped<ISmsSender, TwilioVerifySender>();
-else
-    builder.Services.AddScoped<ISmsSender, LocalOtpSender>();
+//#region Infobip Settings (IMPORTANT)
+//builder.Services.Configure<InfobipSettings>(
+//    builder.Configuration.GetSection("Infobip"));
+//#endregion
 
-// Database
+#region SMS + OTP
+//builder.Services.AddHttpClient<ISmsSender, InfobipSmsSender>((sp, client) =>
+//{
+//    var config = sp.GetRequiredService<IConfiguration>();
+
+//    var baseUrl = config["Sms:Infobip:BaseUrl"];
+//    var apiKey = config["Sms:Infobip:ApiKey"];
+
+//    if (string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(apiKey))
+//        throw new InvalidOperationException("Infobip config is missing.");
+
+//    client.BaseAddress = new Uri(baseUrl);
+
+//    client.DefaultRequestHeaders.Authorization =
+//        new System.Net.Http.Headers.AuthenticationHeaderValue("App", apiKey);
+//});
+
+//builder.Services.AddScoped<IOtpService, OtpService>();
+
+builder.Services.AddMemoryCache();
+
+#region SMS + OTP (Infobip 2FA)
+builder.Services.AddHttpClient<IOtpService, OtpService>((sp, client) =>
+{
+    var config = sp.GetRequiredService<IConfiguration>();
+
+    var baseUrl = config["Sms:Infobip:BaseUrl"];   // ✅ بدل Infobip:BaseUrl
+    var apiKey = config["Sms:Infobip:ApiKey"];      // ✅
+
+    if (string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(apiKey))
+        throw new InvalidOperationException("Infobip config missing");
+
+    client.BaseAddress = new Uri(baseUrl);
+    client.DefaultRequestHeaders.Add("Authorization", $"App {apiKey}");
+});
+#endregion
+//builder.Services.AddScoped<IAuthService, AuthService>();
+#endregion
+
+#region Database
 builder.Services.AddDbContext<SolidDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection")));
+#endregion
 
-// Stripe global config
+#region Stripe
 StripeConfiguration.ApiKey = builder.Configuration["Stripe:SecretKey"];
+#endregion
 
-#region DI
+#region Dependency Injection
 builder.Services.AddScoped<IAuthContext, JwtAuthContext>();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IJwtTokenRevocationService, JwtTokenRevocationService>();
+
 builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 builder.Services.AddScoped<ICacheRepository, CacheRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -79,11 +129,10 @@ builder.Services.AddScoped<IGroupRepository, GroupRepository>();
 builder.Services.AddScoped<ISessionRepository, SessionRepository>();
 builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
 builder.Services.AddScoped<IRecommendationRepository, RecommendationRepository>();
+
 builder.Services.AddScoped<IAuthService, AuthService>();
-builder.Services.AddScoped<IOtpService, OtpService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 
-// ✅ JaaS token service
 builder.Services.AddScoped<IJaasTokenService, JaasTokenService>();
 #endregion
 
@@ -97,24 +146,35 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwtKey)),
+
             ValidateIssuer = true,
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
+
             ValidateAudience = true,
             ValidAudience = builder.Configuration["Jwt:Audience"],
+
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromMinutes(1)
         };
+
         options.Events = new JwtBearerEvents
         {
             OnTokenValidated = async context =>
             {
-                var authorization = context.HttpContext.Request.Headers.Authorization.FirstOrDefault();
-                var token = authorization?.Replace("Bearer ", "", StringComparison.OrdinalIgnoreCase);
-                if (string.IsNullOrWhiteSpace(token)) { context.Fail("Token is missing."); return; }
+                var authHeader = context.HttpContext.Request.Headers.Authorization.FirstOrDefault();
+                var token = authHeader?.Replace("Bearer ", "", StringComparison.OrdinalIgnoreCase);
+
+                if (string.IsNullOrWhiteSpace(token))
+                {
+                    context.Fail("Token is missing.");
+                    return;
+                }
 
                 var revocationService = context.HttpContext.RequestServices
                     .GetRequiredService<IJwtTokenRevocationService>();
+
                 if (await revocationService.IsRevokedAsync(token))
                     context.Fail("Token has been revoked.");
             }
@@ -126,19 +186,22 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-// ✅ Seeder only in Development
+#region Seeder
 if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<SolidDbContext>();
     await DatabaseSeeder.SeedAsync(dbContext);
 }
+#endregion
 
+#region Swagger UI
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+#endregion
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -159,6 +222,9 @@ protectedApi.MapRecommendationSlice();
 protectedApi.MapSettingsSlice();
 #endregion
 
-app.MapHub<NotificationsHub>("/hubs/notifications").RequireAuthorization();
+#region SignalR
+app.MapHub<NotificationsHub>("/hubs/notifications")
+   .RequireAuthorization();
+#endregion
 
 app.Run();

@@ -124,7 +124,7 @@ public sealed class InfobipSmsSender(HttpClient httpClient) : ISmsSender
                     {
                         new { to = phoneNumber }
                     },
-                    from = "+447491163443",
+                    from = "SOLID",
                     text = message
                 }
             }

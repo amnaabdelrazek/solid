@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 using Solid.Api.Database;
 using Solid.Api.Database.Entities;
 using Solid.Api.Features.Settings;
@@ -8,7 +9,8 @@ namespace Solid.Api.Features.Notifications;
 
 public sealed class NotificationService(
     SolidDbContext dbContext,
-    IHubContext<NotificationsHub> hubContext) : INotificationService
+    IHubContext<NotificationsHub> hubContext,
+    IPushNotificationService pushNotificationService) : INotificationService
 {
     public async Task NotifyUsersAsync(
         IEnumerable<long> userIds,
@@ -61,5 +63,61 @@ public sealed class NotificationService(
                 .Group($"user:{notification.NotifiableId}")
                 .SendAsync("notification", NotificationResource.From(notification));
         }
+
+        // 🔔 إرسال Push Notification عبر Firebase لأي يوزر معاه fcm_token مسجل
+        await SendPushNotificationsAsync(recipients, type, title, body, data);
+    }
+
+    private async Task SendPushNotificationsAsync(
+        long[] recipients,
+        string type,
+        string title,
+        string body,
+        object? data)
+    {
+        var fcmTokens = await dbContext.Users
+            .AsNoTracking()
+            .Where(user => recipients.Contains(user.Id) && user.FcmToken != null)
+            .Select(user => user.FcmToken!)
+            .ToListAsync();
+
+        if (fcmTokens.Count == 0)
+        {
+            return;
+        }
+
+        var pushData = BuildPushData(type, data);
+
+        await pushNotificationService.SendToManyAsync(fcmTokens, title, body, pushData);
+    }
+
+    private static Dictionary<string, string> BuildPushData(string type, object? data)
+    {
+        var result = new Dictionary<string, string> { ["type"] = type };
+
+        if (data is null)
+        {
+            return result;
+        }
+
+        var dataJson = JsonSerializer.Serialize(data);
+        var dataDictionary = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(dataJson);
+
+        if (dataDictionary is null)
+        {
+            return result;
+        }
+
+        foreach (var (key, value) in dataDictionary)
+        {
+            result[key] = value.ValueKind switch
+            {
+                JsonValueKind.String => value.GetString() ?? string.Empty,
+                JsonValueKind.Null => string.Empty,
+                _ => value.ToString()
+            };
+        }
+
+        return result;
     }
 }

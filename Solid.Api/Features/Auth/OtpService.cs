@@ -206,43 +206,66 @@ public sealed class OtpService(
     private readonly string _applicationId = configuration["Sms:Infobip:ApplicationId"]!;
     private readonly string _messageId = configuration["Sms:Infobip:MessageId"]!;
 
-    public async Task<string> StartRegistrationOtpAsync(string mobileNumber)
+    //public async Task<string> StartRegistrationOtpAsync(string mobileNumber)
+    //{
+    //    var url = $"{_baseUrl}/2fa/2/pin";
+
+    //    var body = new
+    //    {
+    //        applicationId = _applicationId,
+    //        messageId = _messageId,
+    //        from = "SOLID",
+    //        to = mobileNumber
+    //    };
+
+    //    var result = await SendAsync<StartOtpResponse>(url, body, throwOnError: true);
+
+    //    if (string.IsNullOrWhiteSpace(result?.PinId))
+    //    {
+    //        logger.LogError("Failed to start OTP for {Mobile}", mobileNumber);
+    //        throw new InvalidOperationException("OTP service failed");
+    //    }
+
+    //    return result.PinId;
+    //}
+
+
+
+    public Task<string> StartRegistrationOtpAsync(string mobileNumber)
     {
-        var url = $"{_baseUrl}/2fa/2/pin";
+        logger.LogWarning(
+            "DEV MODE OTP for {Mobile}: 111111",
+            mobileNumber);
 
-        var body = new
-        {
-            applicationId = _applicationId,
-            messageId = _messageId,
-            from = "SOLID",
-            to = mobileNumber
-        };
-
-        var result = await SendAsync<StartOtpResponse>(url, body, throwOnError: true);
-
-        if (string.IsNullOrWhiteSpace(result?.PinId))
-        {
-            logger.LogError("Failed to start OTP for {Mobile}", mobileNumber);
-            throw new InvalidOperationException("OTP service failed");
-        }
-
-        return result.PinId;
+        return Task.FromResult(Guid.NewGuid().ToString());
     }
 
-    public async Task<bool> VerifyRegistrationOtpAsync(string pinId, string code)
+    //public async Task<bool> VerifyRegistrationOtpAsync(string pinId, string code)
+    //{
+    //    var url = $"{_baseUrl}/2fa/2/pin/{pinId}/verify";
+
+    //    var response = await SendAsync<object>(url, new { pin = code }, throwOnError: false);
+
+    //    return response != null;
+    //}
+
+
+    public Task<bool> VerifyRegistrationOtpAsync(string pinId, string code)
     {
-        var url = $"{_baseUrl}/2fa/2/pin/{pinId}/verify";
-
-        var response = await SendAsync<object>(url, new { pin = code }, throwOnError: false);
-
-        return response != null;
+        return Task.FromResult(code == "111111");
     }
 
     public Task<string> SendPasswordResetOtpAsync(long userId, string mobileNumber)
         => StartRegistrationOtpAsync(mobileNumber);
 
+    //public Task<bool> VerifyPasswordResetOtpAsync(string pinId, string code)
+    //    => VerifyRegistrationOtpAsync(pinId, code);
+
+
     public Task<bool> VerifyPasswordResetOtpAsync(string pinId, string code)
-        => VerifyRegistrationOtpAsync(pinId, code);
+    {
+        return Task.FromResult(code == "111111");
+    }
 
     private async Task<T?> SendAsync<T>(string url, object body, bool throwOnError)
     {

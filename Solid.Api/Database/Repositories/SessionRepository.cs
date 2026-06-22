@@ -12,6 +12,7 @@ public sealed class SessionRepository(SolidDbContext dbContext) : ISessionReposi
 
         if (string.Equals(role, "admin", StringComparison.OrdinalIgnoreCase))
         {
+            // Admin: every session in the system.
             return await query
                 .OrderBy(session => session.ScheduledAt)
                 .ToListAsync();
@@ -19,19 +20,19 @@ public sealed class SessionRepository(SolidDbContext dbContext) : ISessionReposi
 
         if (string.Equals(role, "instructor", StringComparison.OrdinalIgnoreCase))
         {
+            // Instructor: only the sessions they are assigned to teach.
             return await query
                 .Where(session => session.InstructorId == userId)
                 .OrderBy(session => session.ScheduledAt)
                 .ToListAsync();
         }
 
-        var sessions = await query
+        // Regular user (addict): only sessions they have paid for or already attended.
+        return await query
+            .Where(session =>
+                session.Attendances.Any(attendance => attendance.UserId == userId && attendance.WasPresent))
             .OrderBy(session => session.ScheduledAt)
             .ToListAsync();
-
-        return sessions
-            .Where(session => !IsFull(session))
-            .ToList();
     }
 
     public async Task<IReadOnlyList<TherapySession>> UpcomingPaidForUserAsync(long userId)
@@ -73,6 +74,8 @@ public sealed class SessionRepository(SolidDbContext dbContext) : ISessionReposi
 
     public async Task<TherapySession?> FindAsync(long sessionId, long userId, string? role)
     {
+        await ExpireLiveSessionsAsync();
+
         var session = await ActiveSessionsQuery()
             .FirstOrDefaultAsync(session => session.Id == sessionId);
 
@@ -93,6 +96,8 @@ public sealed class SessionRepository(SolidDbContext dbContext) : ISessionReposi
 
     public async Task<TherapySession?> FindAnyAsync(long sessionId)
     {
+        await ExpireLiveSessionsAsync();
+
         return await dbContext.TherapySessions
             .AsNoTracking()
             .Include(session => session.Group.Members)
@@ -154,6 +159,8 @@ public sealed class SessionRepository(SolidDbContext dbContext) : ISessionReposi
 
     public async Task<JoinSessionResult> RecordJoinAsync(long sessionId, long userId)
     {
+        await ExpireLiveSessionsAsync();
+
         var session = await dbContext.TherapySessions
             .Include(session => session.Group.Members)
             .Include(session => session.Attendances)
@@ -332,6 +339,39 @@ public sealed class SessionRepository(SolidDbContext dbContext) : ISessionReposi
         await dbContext.SaveChangesAsync();
 
         return attendance;
+    }
+
+    /// <summary>
+    /// أي سيشن status بتاعها "live" بس فعليًا عدت المدة بتاعتها (StartedAt + DurationMinutes)
+    /// بيتم تحويلها أوتوماتيك لـ "finished" قبل أي قراية للسيشنز.
+    /// لازم يتنادي في أول أي method بترجع/تتأكد من سيشنز بحالة live.
+    /// </summary>
+    private async Task ExpireLiveSessionsAsync()
+    {
+        var now = DateTime.UtcNow;
+
+        var liveSessions = await dbContext.TherapySessions
+            .Where(session => session.Status == "live" && session.DeletedAt == null)
+            .ToListAsync();
+
+        var expiredSessions = liveSessions
+            .Where(session => session.StartedAt.HasValue &&
+                               session.StartedAt.Value.AddMinutes(session.DurationMinutes) <= now)
+            .ToList();
+
+        if (expiredSessions.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var session in expiredSessions)
+        {
+            session.Status = "finished";
+            session.EndedAt = session.StartedAt!.Value.AddMinutes(session.DurationMinutes);
+            session.UpdatedAt = now;
+        }
+
+        await dbContext.SaveChangesAsync();
     }
 
     private IQueryable<TherapySession> ActiveSessionsQuery()

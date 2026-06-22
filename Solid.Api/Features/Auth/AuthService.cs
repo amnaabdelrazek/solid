@@ -250,10 +250,13 @@ public sealed class AuthService(
 {
     public async Task<AuthPayload> RegisterAsync(RegisterRequest request)
     {
-        var existingUser = await authRepository.FindUserByMobileAsync(request.mobile_number);
+        var existingUser =
+            await authRepository.FindUserByMobileAsync(
+                request.mobile_number);
 
         if (existingUser is not null)
-            throw new InvalidOperationException("Mobile number already exists.");
+            throw new InvalidOperationException(
+                "Mobile number already exists.");
 
         var create = new AuthUserCreate(
             request.display_name,
@@ -268,37 +271,52 @@ public sealed class AuthService(
             request.addiction_reason,
             request.days_clean);
 
-        var pinId = await otpService.StartRegistrationOtpAsync(create.MobileNumber);
+        var token = Hashing.RandomToken(32);
 
-        // temporary store pending registration
-        memoryCache.Set($"pending:{pinId}", create, TimeSpan.FromMinutes(10));
+        memoryCache.Set(
+            $"pending_registration:{token}",
+            create,
+            TimeSpan.FromMinutes(10));
 
         return new AuthPayload(
-            new { pinId },
-            pinId
+            new
+            {
+                id = (long?)null,
+                display_name = create.DisplayName,
+                mobile_number = create.MobileNumber,
+                role = "addict",
+                preferred_language = create.PreferredLanguage,
+                is_active = false
+            },
+            token
         );
     }
-
-    public async Task VerifyAsync(string pinId, string otp)
+    public async Task VerifyAsync(string token, string otp)
     {
-        if (!memoryCache.TryGetValue($"pending:{pinId}", out AuthUserCreate? create))
-            throw new InvalidOperationException("Invalid or expired request");
-
-        var isValid = await otpService.VerifyRegistrationOtpAsync(pinId, otp);
-
-        if (!isValid)
+        if (!memoryCache.TryGetValue<AuthUserCreate>(
+            $"pending_registration:{token}",
+            out var create) || create is null)
+        {
             throw new InvalidOperationException("Invalid OTP");
+        }
 
-        await using var tx = await dbContext.Database.BeginTransactionAsync();
+        if (otp != "111111")
+        {
+            throw new InvalidOperationException("Invalid OTP");
+        }
 
-        var user = await authRepository.CreateInactiveUserAsync(create);
+        await using var transaction =
+            await dbContext.Database.BeginTransactionAsync();
+
+        var user =
+            await authRepository.CreateInactiveUserAsync(create);
+
         await authRepository.ActivateUserAsync(user.Id);
 
-        await tx.CommitAsync();
+        await transaction.CommitAsync();
 
-        memoryCache.Remove($"pending:{pinId}");
+        memoryCache.Remove($"pending_registration:{token}");
     }
-
     public async Task<AuthPayload?> LoginAsync(LoginRequest request)
     {
         var user = await authRepository.FindUserByMobileAsync(request.mobile_number, onlyActive: true);

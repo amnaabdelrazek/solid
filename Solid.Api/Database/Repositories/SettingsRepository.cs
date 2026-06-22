@@ -74,9 +74,79 @@ public sealed class SettingsRepository(SolidDbContext dbContext) : ISettingsRepo
     {
         return await dbContext.Notifications
             .AsNoTracking()
-            .Where(notification => notification.NotifiableId == userId)
+            .Where(notification => notification.NotifiableId == userId && notification.DeletedAt == null)
             .OrderByDescending(notification => notification.CreatedAt)
             .Take(20)
             .ToListAsync();
+    }
+
+    // جديد — تعليم نوتيفيكيشن واحدة كمقروءة
+    public async Task<bool> MarkNotificationReadAsync(long userId, Guid notificationId)
+    {
+        var notification = await dbContext.Notifications
+            .FirstOrDefaultAsync(n =>
+                n.Id == notificationId &&
+                n.NotifiableId == userId &&
+                n.DeletedAt == null);
+
+        if (notification is null)
+        {
+            return false;
+        }
+
+        var now = DateTime.UtcNow;
+        notification.ReadAt ??= now;
+        notification.UpdatedAt = now;
+
+        await dbContext.SaveChangesAsync();
+
+        return true;
+    }
+
+    // جديد — تعليم كل نوتيفيكيشن اليوزر كمقروءة
+    public async Task<int> MarkAllNotificationsReadAsync(long userId)
+    {
+        var now = DateTime.UtcNow;
+
+        return await dbContext.Notifications
+            .Where(n => n.NotifiableId == userId && n.DeletedAt == null && n.ReadAt == null)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(n => n.ReadAt, now)
+                .SetProperty(n => n.UpdatedAt, now));
+    }
+
+    // جديد — Soft delete لنوتيفيكيشن واحدة
+    public async Task<bool> SoftDeleteNotificationAsync(long userId, Guid notificationId)
+    {
+        var notification = await dbContext.Notifications
+            .FirstOrDefaultAsync(n =>
+                n.Id == notificationId &&
+                n.NotifiableId == userId &&
+                n.DeletedAt == null);
+
+        if (notification is null)
+        {
+            return false;
+        }
+
+        var now = DateTime.UtcNow;
+        notification.DeletedAt = now;
+        notification.UpdatedAt = now;
+
+        await dbContext.SaveChangesAsync();
+
+        return true;
+    }
+
+    // جديد — Soft delete لكل نوتيفيكيشن اليوزر
+    public async Task<int> SoftDeleteAllNotificationsAsync(long userId)
+    {
+        var now = DateTime.UtcNow;
+
+        return await dbContext.Notifications
+            .Where(n => n.NotifiableId == userId && n.DeletedAt == null)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(n => n.DeletedAt, now)
+                .SetProperty(n => n.UpdatedAt, now));
     }
 }

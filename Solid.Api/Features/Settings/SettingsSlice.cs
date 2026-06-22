@@ -15,6 +15,10 @@ public static class SettingsSlice
         v1.MapGet("/settings/{key}", Show);
         v1.MapPut("/settings/{key}", Update);
         v1.MapGet("/notifications", Notifications);
+        v1.MapPut("/notifications/{id:guid}/read", MarkNotificationRead);
+        v1.MapPut("/notifications/read-all", MarkAllNotificationsRead);   // جديد
+        v1.MapDelete("/notifications/{id:guid}", DeleteNotification);
+        v1.MapDelete("/notifications", DeleteAllNotifications);
 
         return api;
     }
@@ -75,6 +79,53 @@ public static class SettingsSlice
             }
         });
     }
+    // PUT /api/v1/notifications/{id}/read
+    private static async Task<IResult> MarkNotificationRead(
+        Guid id,
+        IAuthContext auth,
+        ISettingsRepository settingsRepository)
+    {
+        var success = await settingsRepository.MarkNotificationReadAsync(auth.UserId, id);
+
+        return success
+            ? ApiResponse.Ok(message: "Notification marked as read.")
+            : ApiResponse.Fail("Notification not found.", StatusCodes.Status404NotFound);
+    }
+
+
+    // PUT /api/v1/notifications/read-all
+    private static async Task<IResult> MarkAllNotificationsRead(
+        IAuthContext auth,
+        ISettingsRepository settingsRepository)
+    {
+        await settingsRepository.MarkAllNotificationsReadAsync(auth.UserId);
+
+        return ApiResponse.Ok(message: "All notifications marked as read.");
+    }
+
+
+    // DELETE /api/v1/notifications/{id}
+    private static async Task<IResult> DeleteNotification(
+        Guid id,
+        IAuthContext auth,
+        ISettingsRepository settingsRepository)
+    {
+        var success = await settingsRepository.SoftDeleteNotificationAsync(auth.UserId, id);
+
+        return success
+            ? ApiResponse.Ok(message: "Notification deleted.")
+            : ApiResponse.Fail("Notification not found.", StatusCodes.Status404NotFound);
+    }
+
+    // DELETE /api/v1/notifications
+    private static async Task<IResult> DeleteAllNotifications(
+        IAuthContext auth,
+        ISettingsRepository settingsRepository)
+    {
+        await settingsRepository.SoftDeleteAllNotificationsAsync(auth.UserId);
+
+        return ApiResponse.Ok(message: "All notifications deleted.");
+    }
 
     private static object Setting(string? value, string type)
     {
@@ -86,6 +137,7 @@ public static class SettingsSlice
         return string.Equals(key, "privacy_policy", StringComparison.OrdinalIgnoreCase) ||
                string.Equals(key, "terms_and_conditions", StringComparison.OrdinalIgnoreCase);
     }
+
 }
 
 public sealed record SettingRequest(object? value);

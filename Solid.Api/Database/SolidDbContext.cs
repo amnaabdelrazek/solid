@@ -16,7 +16,7 @@ public sealed class SolidDbContext(DbContextOptions<SolidDbContext> options) : D
     public DbSet<UserTreatmentType> UserTreatmentTypes => Set<UserTreatmentType>();
 
     public DbSet<DeviceSession> DeviceSessions => Set<DeviceSession>();
-
+        
     public DbSet<LookupType> LookupTypes => Set<LookupType>();
 
     public DbSet<LookupValue> LookupValues => Set<LookupValue>();
@@ -509,10 +509,10 @@ public sealed class SolidDbContext(DbContextOptions<SolidDbContext> options) : D
             entity.Property(notification => notification.NotifiableId).HasColumnName("notifiable_id");
             entity.Property(notification => notification.Data).HasColumnName("data");
             entity.Property(notification => notification.ReadAt).HasColumnName("read_at");
+            entity.Property(notification => notification.DeletedAt).HasColumnName("deleted_at"); // جديد
             entity.Property(notification => notification.CreatedAt).HasColumnName("created_at");
             entity.Property(notification => notification.UpdatedAt).HasColumnName("updated_at");
         });
-
         modelBuilder.Entity<CacheEntry>(entity =>
         {
             entity.ToTable("cache");

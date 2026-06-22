@@ -11,4 +11,13 @@ public interface ISettingsRepository
     Task SetRawAsync(string group, string name, string value);
 
     Task<IReadOnlyList<Notification>> NotificationsAsync(long userId);
+
+    // جديد
+    Task<bool> MarkNotificationReadAsync(long userId, Guid notificationId);
+    Task<int> MarkAllNotificationsReadAsync(long userId);   // جديد
+
+
+    Task<bool> SoftDeleteNotificationAsync(long userId, Guid notificationId);
+
+    Task<int> SoftDeleteAllNotificationsAsync(long userId);
 }

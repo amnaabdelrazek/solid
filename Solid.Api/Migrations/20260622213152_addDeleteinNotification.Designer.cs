@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Solid.Api.Database;
 
@@ -11,9 +12,11 @@ using Solid.Api.Database;
 namespace Solid.Api.Migrations
 {
     [DbContext(typeof(SolidDbContext))]
-    partial class SolidDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260622213152_addDeleteinNotification")]
+    partial class addDeleteinNotification
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

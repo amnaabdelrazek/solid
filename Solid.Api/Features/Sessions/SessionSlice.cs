@@ -50,7 +50,9 @@ public static class SessionSlice
 
         var request = payload.Value!;
 
-        if (request.group_id <= 0 || request.scheduled_at == default)
+        var substanceCategoryId = request.substance_category_id ?? request.substance_categories_id ?? request.group_id;
+
+        if (substanceCategoryId is null or <= 0 || request.scheduled_at == default)
             return ApiResponse.Fail("The given data was invalid.", StatusCodes.Status422UnprocessableEntity);
 
         var instructorId = auth.IsInstructor() ? auth.UserId : request.instructor_id;
@@ -61,21 +63,21 @@ public static class SessionSlice
         var scheduledAtUtc = EgyptDateTime.ToUtcFromEgyptClock(request.scheduled_at);
 
         var result = await sessionRepository.CreateAsync(new SessionCreate(
-            request.group_id,
+            substanceCategoryId.Value,
             instructorId.Value,
             request.session_number,
             request.title,
             request.session_type ?? "group",
             scheduledAtUtc,
             request.duration_minutes ?? 45,
-            request.max_participants,
+            Math.Min(request.max_participants ?? 15, 15),
             request.metadata));
 
         if (result.Session is null)
             return ApiResponse.Fail(result.Error ?? "Unable to create session.", result.StatusCode);
 
         await notificationService.NotifyUsersAsync(
-            SessionRecipients(result.Session, includeInstructor: true),
+            await SessionRecipientsAsync(sessionRepository, result.Session, includeInstructor: true),
             "SessionCreated",
             "New session",
             $"Session #{result.Session.SessionNumber ?? result.Session.Id} has been scheduled.",
@@ -83,7 +85,7 @@ public static class SessionSlice
             new
             {
                 session_id = result.Session.Id,
-                group_id = result.Session.GroupId,
+                substance_category_id = result.Session.SubstanceCategoryId,
                 scheduled_at = EgyptDateTime.Format(result.Session.ScheduledAt)
             });
 
@@ -196,7 +198,7 @@ public static class SessionSlice
             return ApiResponse.Fail("Not found.", StatusCodes.Status404NotFound);
 
         await notificationService.NotifyUsersAsync(
-            SessionRecipients(session, includeInstructor: false),
+            await SessionRecipientsAsync(sessionRepository, session, includeInstructor: false),
             "SessionStarted",
             "Session started",
             $"Session #{session.SessionNumber ?? session.Id} has started.",
@@ -204,7 +206,7 @@ public static class SessionSlice
             new
             {
                 session_id = session.Id,
-                group_id = session.GroupId
+                substance_category_id = session.SubstanceCategoryId
             });
 
         var user = await userRepository.FindAsync(auth.UserId);
@@ -323,11 +325,12 @@ public static class SessionSlice
         updated_at = EgyptDateTime.Format(attendance.UpdatedAt)
     };
 
-    private static IEnumerable<long> SessionRecipients(TherapySession session, bool includeInstructor)
+    private static async Task<IEnumerable<long>> SessionRecipientsAsync(
+        ISessionRepository sessionRepository,
+        TherapySession session,
+        bool includeInstructor)
     {
-        var memberIds = session.Group.Members
-            .Where(member => member.IsActive)
-            .Select(member => member.UserId);
+        var memberIds = await sessionRepository.UserIdsForSubstanceCategoryAsync(session.SubstanceCategoryId);
 
         return includeInstructor
             ? memberIds.Append(session.InstructorId)
@@ -336,7 +339,9 @@ public static class SessionSlice
 }
 
 public sealed record CreateSessionRequest(
-    long group_id,
+    long? substance_category_id,
+    long? group_id,
+    long? substance_categories_id,
     long? instructor_id,
     int? session_number,
     string? title,

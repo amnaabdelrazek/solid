@@ -344,9 +344,10 @@ public sealed class SolidDbContext(DbContextOptions<SolidDbContext> options) : D
             entity.ToTable("therapy_sessions");
             entity.HasKey(session => session.Id);
             entity.HasIndex(session => session.JitsiRoomName).IsUnique();
+            entity.HasIndex(session => session.SubstanceCategoryId);
 
             entity.Property(session => session.Id).HasColumnName("id");
-            entity.Property(session => session.GroupId).HasColumnName("group_id");
+            entity.Property(session => session.SubstanceCategoryId).HasColumnName("substance_category_id");
             entity.Property(session => session.InstructorId).HasColumnName("instructor_id");
             entity.Property(session => session.SessionNumber).HasColumnName("session_number");
             entity.Property(session => session.SessionType).HasColumnName("session_type").HasMaxLength(50);
@@ -362,9 +363,9 @@ public sealed class SolidDbContext(DbContextOptions<SolidDbContext> options) : D
             entity.Property(session => session.CreatedAt).HasColumnName("created_at");
             entity.Property(session => session.UpdatedAt).HasColumnName("updated_at");
 
-            entity.HasOne(session => session.Group)
-                .WithMany(group => group.Sessions)
-                .HasForeignKey(session => session.GroupId)
+            entity.HasOne(session => session.SubstanceCategory)
+                .WithMany(category => category.TherapySessions)
+                .HasForeignKey(session => session.SubstanceCategoryId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasOne(session => session.Instructor)

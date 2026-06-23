@@ -22,5 +22,7 @@ public sealed class SubstanceCategory
 
     public ICollection<Group> Groups { get; set; } = [];
 
+    public ICollection<TherapySession> TherapySessions { get; set; } = [];
+
     public ICollection<Recommendation> Recommendations { get; set; } = [];
 }

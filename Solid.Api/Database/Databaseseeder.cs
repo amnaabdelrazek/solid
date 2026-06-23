@@ -276,7 +276,7 @@ public static class DatabaseSeeder
         {
             session1 = new TherapySession
             {
-                GroupId = group1.Id,
+                SubstanceCategoryId = group1.SubstanceCategoryId!.Value,
                 InstructorId = instructor1.Id,
                 SessionNumber = 1,
                 SessionType = "group",
@@ -301,7 +301,7 @@ public static class DatabaseSeeder
         {
             session2 = new TherapySession
             {
-                GroupId = group1.Id,
+                SubstanceCategoryId = group1.SubstanceCategoryId!.Value,
                 InstructorId = instructor1.Id,
                 SessionNumber = 2,
                 SessionType = "group",
@@ -327,7 +327,7 @@ public static class DatabaseSeeder
         {
             session3 = new TherapySession
             {
-                GroupId = group1.Id,
+                SubstanceCategoryId = group1.SubstanceCategoryId!.Value,
                 InstructorId = instructor1.Id,
                 SessionNumber = 3,
                 SessionType = "group",

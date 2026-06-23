@@ -308,14 +308,31 @@ public sealed class AuthService(
         await using var transaction =
             await dbContext.Database.BeginTransactionAsync();
 
-        var user =
-            await authRepository.CreateInactiveUserAsync(create);
+        var user = await authRepository.CreateInactiveUserAsync(create);
 
         await authRepository.ActivateUserAsync(user.Id);
+
+        await SubscribeUserToGroupAsync(user.Id);   // <-- إضافة السطر ده
 
         await transaction.CommitAsync();
 
         memoryCache.Remove($"pending_registration:{token}");
+    }
+
+    private async Task SubscribeUserToGroupAsync(long userId)
+    {
+        if (await groupRepository.HasActiveMembershipAsync(userId))
+        {
+            return;
+        }
+
+        var group = await groupRepository.FindOrCreateForUserSubstanceAsync(userId);
+        if (group is null)
+        {
+            return;
+        }
+
+        await groupRepository.AddMemberAsync(group.Id, userId);
     }
     public async Task<AuthPayload?> LoginAsync(LoginRequest request)
     {

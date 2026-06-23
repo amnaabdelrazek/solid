@@ -32,5 +32,4 @@ public sealed class Group
 
     public ICollection<GroupMember> Members { get; set; } = [];
 
-    public ICollection<TherapySession> Sessions { get; set; } = [];
 }

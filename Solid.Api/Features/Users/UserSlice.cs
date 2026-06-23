@@ -256,7 +256,7 @@ public static class UserSlice
     // PUT /api/profile/fcm-token
     // Called by the mobile app every time it obtains/refreshes its Firebase Cloud Messaging
     // registration token, so the backend can target this device with push notifications.
-    private static async Task<IResult> UpdateFcmToken(IAuthContext auth, HttpRequest httpRequest, IUserRepository userRepository)
+    private static async Task<IResult>  UpdateFcmToken(IAuthContext auth, HttpRequest httpRequest, IUserRepository userRepository)
     {
         var payload = await RequestPayload.ReadAsync<FcmTokenRequest>(httpRequest);
         if (payload.Error is not null)

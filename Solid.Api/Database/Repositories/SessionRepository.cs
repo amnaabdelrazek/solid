@@ -6,6 +6,8 @@ namespace Solid.Api.Database.Repositories;
 
 public sealed class SessionRepository(SolidDbContext dbContext) : ISessionRepository
 {
+    private const int MaxSessionParticipants = 15;
+
     public async Task<IReadOnlyList<TherapySession>> ListForUserAsync(long userId, string? role)
     {
         var query = ActiveSessionsQuery();
@@ -41,8 +43,9 @@ public sealed class SessionRepository(SolidDbContext dbContext) : ISessionReposi
 
         return await dbContext.TherapySessions
             .AsNoTracking()
-            .Include(session => session.Group)
+            .Include(session => session.SubstanceCategory)
             .Include(session => session.Attendances)
+            .Include(session => session.Payments)
             .Include(session => session.Instructor)
             .Where(session => session.DeletedAt == null)
             .Where(session => session.ScheduledAt > now)
@@ -59,13 +62,17 @@ public sealed class SessionRepository(SolidDbContext dbContext) : ISessionReposi
 
         return await dbContext.TherapySessions
             .AsNoTracking()
-            .Include(session => session.Group)
+            .Include(session => session.SubstanceCategory)
             .Include(session => session.Attendances)
+            .Include(session => session.Payments)
             .Include(session => session.Instructor)
             .Where(session => session.DeletedAt == null)
             .Where(session => session.ScheduledAt > now)
-            .Where(session => session.Group.Members.Any(member => member.UserId == userId && member.IsActive))
+            .Where(session => dbContext.UserSubstances.Any(userSubstance =>
+                userSubstance.UserId == userId &&
+                userSubstance.Substance.SubstanceCategoryId == session.SubstanceCategoryId))
             .Where(session => !session.Payments.Any(payment => payment.UserId == userId && payment.Status == "paid"))
+            .Where(session => session.Payments.Count(payment => payment.Status == "paid") < MaxSessionParticipants)
             .OrderBy(session => session.SessionNumber ?? int.MaxValue)
             .ThenBy(session => session.ScheduledAt)
             .Take(10)
@@ -86,7 +93,7 @@ public sealed class SessionRepository(SolidDbContext dbContext) : ISessionReposi
 
         if (string.Equals(role, "admin", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(role, "instructor", StringComparison.OrdinalIgnoreCase) && session.InstructorId == userId ||
-            session.Group.Members.Any(member => member.UserId == userId && member.IsActive))
+            await UserHasSubstanceCategoryAsync(userId, session.SubstanceCategoryId))
         {
             return session;
         }
@@ -100,19 +107,20 @@ public sealed class SessionRepository(SolidDbContext dbContext) : ISessionReposi
 
         return await dbContext.TherapySessions
             .AsNoTracking()
-            .Include(session => session.Group.Members)
+            .Include(session => session.SubstanceCategory)
             .Include(session => session.Attendances)
+            .Include(session => session.Payments)
             .FirstOrDefaultAsync(session => session.Id == sessionId && session.DeletedAt == null);
     }
 
     public async Task<CreateSessionResult> CreateAsync(SessionCreate create)
     {
-        var group = await dbContext.Groups
-            .FirstOrDefaultAsync(group => group.Id == create.GroupId && group.DeletedAt == null);
+        var substanceCategory = await dbContext.SubstanceCategories
+            .FirstOrDefaultAsync(category => category.Id == create.SubstanceCategoryId && category.IsActive);
 
-        if (group is null)
+        if (substanceCategory is null)
         {
-            return new CreateSessionResult(null, "Group not found.", StatusCodes.Status404NotFound);
+            return new CreateSessionResult(null, "Substance category not found.", StatusCodes.Status404NotFound);
         }
 
         var instructor = await dbContext.Users
@@ -124,7 +132,7 @@ public sealed class SessionRepository(SolidDbContext dbContext) : ISessionReposi
         }
 
         var nextSessionNumber = create.SessionNumber ?? await dbContext.TherapySessions
-            .Where(session => session.GroupId == create.GroupId)
+            .Where(session => session.SubstanceCategoryId == create.SubstanceCategoryId)
             .Select(session => session.SessionNumber ?? 0)
             .DefaultIfEmpty()
             .MaxAsync() + 1;
@@ -132,21 +140,18 @@ public sealed class SessionRepository(SolidDbContext dbContext) : ISessionReposi
         var now = DateTime.UtcNow;
         var session = new TherapySession
         {
-            GroupId = create.GroupId,
+            SubstanceCategoryId = create.SubstanceCategoryId,
             InstructorId = create.InstructorId,
             SessionNumber = nextSessionNumber,
             SessionType = create.SessionType,
             Status = "scheduled",
             ScheduledAt = create.ScheduledAt,
             DurationMinutes = create.DurationMinutes,
-            JitsiRoomName = $"solid-group-{create.GroupId}-{Guid.NewGuid():N}",
+            JitsiRoomName = $"solid-category-{create.SubstanceCategoryId}-{Guid.NewGuid():N}",
             SessionMetadata = BuildMetadata(create),
             CreatedAt = now,
             UpdatedAt = now
         };
-
-        group.InstructorId ??= create.InstructorId;
-        group.UpdatedAt = now;
 
         dbContext.TherapySessions.Add(session);
         await dbContext.SaveChangesAsync();
@@ -157,13 +162,24 @@ public sealed class SessionRepository(SolidDbContext dbContext) : ISessionReposi
             StatusCodes.Status200OK);
     }
 
+    public async Task<IReadOnlyList<long>> UserIdsForSubstanceCategoryAsync(long substanceCategoryId)
+    {
+        return await dbContext.UserSubstances
+            .AsNoTracking()
+            .Where(userSubstance => userSubstance.Substance.SubstanceCategoryId == substanceCategoryId)
+            .Select(userSubstance => userSubstance.UserId)
+            .Distinct()
+            .ToListAsync();
+    }
+
     public async Task<JoinSessionResult> RecordJoinAsync(long sessionId, long userId)
     {
         await ExpireLiveSessionsAsync();
 
         var session = await dbContext.TherapySessions
-            .Include(session => session.Group.Members)
+            .Include(session => session.SubstanceCategory)
             .Include(session => session.Attendances)
+            .Include(session => session.Payments)
             .FirstOrDefaultAsync(session => session.Id == sessionId && session.DeletedAt == null);
 
         if (session is null)
@@ -176,9 +192,9 @@ public sealed class SessionRepository(SolidDbContext dbContext) : ISessionReposi
             return new JoinSessionResult(false, session, "Session is not live.", StatusCodes.Status422UnprocessableEntity);
         }
 
-        if (!session.Group.Members.Any(member => member.UserId == userId && member.IsActive))
+        if (!await UserHasSubstanceCategoryAsync(userId, session.SubstanceCategoryId))
         {
-            return new JoinSessionResult(false, session, "You are not subscribed to this session group.", StatusCodes.Status403Forbidden);
+            return new JoinSessionResult(false, session, "You are not subscribed to this session category.", StatusCodes.Status403Forbidden);
         }
 
         if (IsFull(session) && session.Attendances.All(attendance => attendance.UserId != userId))
@@ -216,7 +232,7 @@ public sealed class SessionRepository(SolidDbContext dbContext) : ISessionReposi
     {
         var session = await dbContext.TherapySessions
             .AsNoTracking()
-            .Include(session => session.Group.Members)
+            .Include(session => session.SubstanceCategory)
             .FirstOrDefaultAsync(session => session.Id == sessionId && session.DeletedAt == null);
 
         if (session is null)
@@ -229,9 +245,18 @@ public sealed class SessionRepository(SolidDbContext dbContext) : ISessionReposi
             return new SessionBookingResult(false, "You can only book upcoming sessions.", StatusCodes.Status422UnprocessableEntity);
         }
 
-        if (!session.Group.Members.Any(member => member.UserId == userId && member.IsActive))
+        if (!await UserHasSubstanceCategoryAsync(userId, session.SubstanceCategoryId))
         {
-            return new SessionBookingResult(false, "You are not subscribed to this session group.", StatusCodes.Status403Forbidden);
+            return new SessionBookingResult(false, "You are not subscribed to this session category.", StatusCodes.Status403Forbidden);
+        }
+
+        var paidRegistrations = await dbContext.Payments
+            .AsNoTracking()
+            .CountAsync(payment => payment.SessionId == sessionId && payment.Status == "paid");
+
+        if (paidRegistrations >= MaxParticipants(session))
+        {
+            return new SessionBookingResult(false, "Session is full.", StatusCodes.Status422UnprocessableEntity);
         }
 
         var alreadyPaid = await dbContext.Payments
@@ -247,7 +272,7 @@ public sealed class SessionRepository(SolidDbContext dbContext) : ISessionReposi
         var previousPaidSessions = dbContext.TherapySessions
             .AsNoTracking()
             .Where(previous => previous.DeletedAt == null)
-            .Where(previous => previous.GroupId == session.GroupId)
+            .Where(previous => previous.SubstanceCategoryId == session.SubstanceCategoryId)
             .Where(previous => previous.ScheduledAt > now)
             .Where(previous => previous.Id != session.Id);
 
@@ -378,9 +403,10 @@ public sealed class SessionRepository(SolidDbContext dbContext) : ISessionReposi
     {
         return dbContext.TherapySessions
             .AsNoTracking()
-            .Include(session => session.Group.Members)
+            .Include(session => session.SubstanceCategory)
             .Include(session => session.Instructor)
             .Include(session => session.Attendances)
+            .Include(session => session.Payments)
             .Where(session => session.DeletedAt == null)
             /*.Where(session => session.Status != "finished")*/;
     }
@@ -398,10 +424,19 @@ public sealed class SessionRepository(SolidDbContext dbContext) : ISessionReposi
             int.TryParse(Convert.ToString(value), out var maxParticipants) &&
             maxParticipants > 0)
         {
-            return maxParticipants;
+            return Math.Min(maxParticipants, MaxSessionParticipants);
         }
 
-        return session.Group.MaxMembers;
+        return MaxSessionParticipants;
+    }
+
+    private async Task<bool> UserHasSubstanceCategoryAsync(long userId, long substanceCategoryId)
+    {
+        return await dbContext.UserSubstances
+            .AsNoTracking()
+            .AnyAsync(userSubstance =>
+                userSubstance.UserId == userId &&
+                userSubstance.Substance.SubstanceCategoryId == substanceCategoryId);
     }
 
     private static string BuildMetadata(SessionCreate create)

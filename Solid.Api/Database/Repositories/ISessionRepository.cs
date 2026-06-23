@@ -16,6 +16,8 @@ public interface ISessionRepository
 
     Task<CreateSessionResult> CreateAsync(SessionCreate create);
 
+    Task<IReadOnlyList<long>> UserIdsForSubstanceCategoryAsync(long substanceCategoryId);
+
     Task<JoinSessionResult> RecordJoinAsync(long sessionId, long userId);
 
     Task<SessionBookingResult> ValidateBookingAsync(long sessionId, long userId);
@@ -30,7 +32,7 @@ public interface ISessionRepository
 }
 
 public sealed record SessionCreate(
-    long GroupId,
+    long SubstanceCategoryId,
     long InstructorId,
     int? SessionNumber,
     string? Title,

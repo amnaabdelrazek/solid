@@ -8,15 +8,21 @@ public static class SessionResource
         var metadata = JsonPayload.ParseObject(session.SessionMetadata);
         var title = Convert.ToString(metadata.GetValueOrDefault("title"));
         var maxParticipants = Convert.ToString(metadata.GetValueOrDefault("max_participants"));
-        var currentParticipants = session.Attendances.Count(attendance => attendance.WasPresent);
+        var paidParticipants = session.Payments
+            .Where(payment => payment.Status == "paid")
+            .Select(payment => payment.UserId)
+            .Distinct()
+            .Count();
+        var attendedParticipants = session.Attendances.Count(attendance => attendance.WasPresent);
+        var currentParticipants = Math.Max(paidParticipants, attendedParticipants);
 
         return new
         {
             id = session.Id,
-            group_id = session.GroupId,
-            group_name = session.Group?.NameAr,
-            group_name_ar = session.Group?.NameAr,
-            group_name_en = session.Group?.NameEn,
+            group_id = session.SubstanceCategoryId,
+            group_name = session.SubstanceCategory?.NameAr,
+            group_name_ar = session.SubstanceCategory?.NameAr,
+            group_name_en = session.SubstanceCategory?.NameEn,
             instructor_id = session.InstructorId,
             instructor_name = session.Instructor?.DisplayName,
             session_number = session.SessionNumber,
@@ -34,12 +40,12 @@ public static class SessionResource
             jitsi_jwt_issued_at = EgyptDateTime.Format(session.JitsiJwtIssuedAt),
             session_metadata = JsonPayload.Parse(session.SessionMetadata),
             max_participants = int.TryParse(maxParticipants, out var parsedMaxParticipants)
-                ? parsedMaxParticipants
-                : session.Group is null ? null : (int?)session.Group.MaxMembers,
+                ? Math.Min(parsedMaxParticipants, 15)
+                : 15,
             current_participants = currentParticipants,
             is_full = int.TryParse(maxParticipants, out var fullMaxParticipants)
-                ? currentParticipants >= fullMaxParticipants
-                : session.Group is not null && currentParticipants >= session.Group.MaxMembers,
+                ? currentParticipants >= Math.Min(fullMaxParticipants, 15)
+                : currentParticipants >= 15,
             price = price,                              // USE PARAM
             formatted_price = $"{price:0.##} EGP",     // USE PARAM
             created_at = EgyptDateTime.Format(session.CreatedAt),

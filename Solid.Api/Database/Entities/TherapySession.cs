@@ -4,7 +4,7 @@ public sealed class TherapySession
 {
     public long Id { get; set; }
 
-    public long GroupId { get; set; }
+    public long SubstanceCategoryId { get; set; }
 
     public long InstructorId { get; set; }
 
@@ -34,7 +34,7 @@ public sealed class TherapySession
 
     public DateTime? UpdatedAt { get; set; }
 
-    public Group Group { get; set; } = null!;
+    public SubstanceCategory SubstanceCategory { get; set; } = null!;
 
     public User Instructor { get; set; } = null!;
 

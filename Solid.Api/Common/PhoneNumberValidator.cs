@@ -37,25 +37,23 @@ public static partial class PhoneNumberValidator
         if (EgyptLocalRegex().IsMatch(cleanedPhoneNumber))
         {
             normalizedPhoneNumber = $"+2{cleanedPhoneNumber}";
-
             return true;
         }
 
         if (EgyptInternationalWithoutPlusRegex().IsMatch(cleanedPhoneNumber))
         {
             normalizedPhoneNumber = $"+{cleanedPhoneNumber}";
-
             return true;
         }
 
         if (EgyptInternationalWithZerosRegex().IsMatch(cleanedPhoneNumber))
         {
             normalizedPhoneNumber = $"+{cleanedPhoneNumber[2..]}";
-
             return true;
         }
 
-        return false;
+        normalizedPhoneNumber = cleanedPhoneNumber;
+        return true;
     }
 
     public static IReadOnlyList<string> SearchCandidates(string phoneNumber)

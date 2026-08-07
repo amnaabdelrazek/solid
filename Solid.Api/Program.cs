@@ -234,6 +234,7 @@ using FirebaseAdmin;
 using Google.Apis.Auth.OAuth2;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Solid.Api.Database;
@@ -248,6 +249,7 @@ using Solid.Api.Features.Recommendations;
 using Solid.Api.Features.Sessions;
 using Solid.Api.Features.Settings;
 using Solid.Api.Features.Users;
+using Solid.Api.Features.Upload;
 using Solid.Api.Infrastructure.Auth;
 using Solid.Api.Infrastructure.Jitsi;
 using Solid.Api.Infrastructure;
@@ -258,6 +260,18 @@ using System.Text;
 using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var webRootPath = builder.Environment.WebRootPath;
+if (string.IsNullOrWhiteSpace(webRootPath))
+{
+    webRootPath = Path.Combine(builder.Environment.ContentRootPath, "wwwroot");
+    builder.Environment.WebRootPath = webRootPath;
+}
+var uploadsPath = Path.Combine(webRootPath, "uploads");
+if (!Directory.Exists(uploadsPath))
+{
+    Directory.CreateDirectory(uploadsPath);
+}
 
 #region Swagger
 builder.Services.AddEndpointsApiExplorer();
@@ -339,6 +353,7 @@ if (!string.IsNullOrWhiteSpace(firebaseProjectId) &&
 }
 
 builder.Services.AddSingleton<IPushNotificationService, PushNotificationService>();
+builder.Services.AddHostedService<Solid.Api.Features.Sessions.SessionStatusBackgroundService>();
 #endregion
 
 #region Database
@@ -350,6 +365,8 @@ builder.Services.AddDbContext<SolidDbContext>(options =>
 #region Stripe
 StripeConfiguration.ApiKey = builder.Configuration["Stripe:SecretKey"];
 #endregion
+
+
 
 #region Dependency Injection
 builder.Services.AddScoped<IAuthContext, JwtAuthContext>();
@@ -419,6 +436,18 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization();
 #endregion
+#region CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy
+            .AllowAnyOrigin()
+            .AllowAnyMethod()
+            .AllowAnyHeader();
+    });
+});
+#endregion
 
 var app = builder.Build();
 
@@ -439,6 +468,13 @@ if (app.Environment.IsDevelopment())
 }
 #endregion
 
+app.UseCors("AllowAll");
+app.UseStaticFiles();
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(uploadsPath),
+    RequestPath = "/uploads"
+});
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -456,6 +492,7 @@ protectedApi.MapSessionSlice();
 protectedApi.MapPaymentSlice();
 protectedApi.MapRecommendationSlice();
 protectedApi.MapSettingsSlice();
+protectedApi.MapUploadSlice();
 #endregion
 
 #region SignalR

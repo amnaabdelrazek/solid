@@ -3,11 +3,20 @@ using Solid.Api.Database.Entities;
 
 public static class SessionResource
 {
-    public static object From(TherapySession session, decimal price = 0)
+    public static object From(TherapySession session, decimal price = 0, long? userId = null)
     {
         var metadata = JsonPayload.ParseObject(session.SessionMetadata);
         var title = Convert.ToString(metadata.GetValueOrDefault("title"));
         var maxParticipants = Convert.ToString(metadata.GetValueOrDefault("max_participants"));
+        var userAttendance = userId.HasValue
+            ? session.Attendances.FirstOrDefault(attendance => attendance.UserId == userId.Value)
+            : null;
+        var isBooked = userId.HasValue && session.Payments.Any(payment =>
+            payment.UserId == userId.Value &&
+            payment.Status == "paid");
+        var attendanceStatus = userId.HasValue && (isBooked || userAttendance is not null)
+            ? userAttendance?.WasPresent == true ? "attended" : "absent"
+            : null;
         var paidParticipants = session.Payments
             .Where(payment => payment.Status == "paid")
             .Select(payment => payment.UserId)
@@ -28,7 +37,7 @@ public static class SessionResource
             session_number = session.SessionNumber,
             title = string.IsNullOrWhiteSpace(title) ? $"Session {session.SessionNumber}" : title,
             session_type = session.SessionType,
-            session_type_label = session.SessionType == "paid" ? "Paid Session" : "Group Session",
+            session_type_label = string.Equals(session.SessionType, "individual", StringComparison.OrdinalIgnoreCase) ? "Individual Session" : "Group Session",
             status = session.Status,
             scheduled_at = EgyptDateTime.Format(session.ScheduledAt),
             date = EgyptDateTime.Date(session.ScheduledAt),
@@ -40,18 +49,31 @@ public static class SessionResource
             jitsi_jwt_issued_at = EgyptDateTime.Format(session.JitsiJwtIssuedAt),
             session_metadata = JsonPayload.Parse(session.SessionMetadata),
             max_participants = int.TryParse(maxParticipants, out var parsedMaxParticipants)
-                ? Math.Min(parsedMaxParticipants, 15)
-                : 15,
+                ? MaxParticipants(session, parsedMaxParticipants)
+                : MaxParticipants(session, null),
             current_participants = currentParticipants,
-            is_full = int.TryParse(maxParticipants, out var fullMaxParticipants)
-                ? currentParticipants >= Math.Min(fullMaxParticipants, 15)
-                : currentParticipants >= 15,
+            is_full = currentParticipants >= (int.TryParse(maxParticipants, out var fullMaxParticipants)
+                ? MaxParticipants(session, fullMaxParticipants)
+                : MaxParticipants(session, null)),
             price = price,                              // USE PARAM
             formatted_price = $"{price:0.##} EGP",     // USE PARAM
             created_at = EgyptDateTime.Format(session.CreatedAt),
             updated_at = EgyptDateTime.Format(session.UpdatedAt),
-            is_booked = false,
+            is_booked = isBooked,
+            attendance_status = attendanceStatus,
             is_locked = session.Status != "live"
         };
+    }
+
+    private static int MaxParticipants(TherapySession session, int? metadataMaxParticipants)
+    {
+        if (string.Equals(session.SessionType, "individual", StringComparison.OrdinalIgnoreCase))
+        {
+            return 1;
+        }
+
+        return metadataMaxParticipants is > 0
+            ? Math.Min(metadataMaxParticipants.Value, 15)
+            : 15;
     }
 }

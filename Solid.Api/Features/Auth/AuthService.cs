@@ -271,25 +271,19 @@ public sealed class AuthService(
             request.addiction_reason,
             request.days_clean);
 
-        var token = Hashing.RandomToken(32);
+        await using var transaction = await dbContext.Database.BeginTransactionAsync();
 
-        memoryCache.Set(
-            $"pending_registration:{token}",
-            create,
-            TimeSpan.FromMinutes(10));
+        var user = await authRepository.CreateInactiveUserAsync(create);
 
-        return new AuthPayload(
-            new
-            {
-                id = (long?)null,
-                display_name = create.DisplayName,
-                mobile_number = create.MobileNumber,
-                role = "addict",
-                preferred_language = create.PreferredLanguage,
-                is_active = false
-            },
-            token
-        );
+        await authRepository.ActivateUserAsync(user.Id);
+
+        await SubscribeUserToGroupAsync(user.Id);
+
+        await transaction.CommitAsync();
+
+        var token = jwtTokenService.Create(user.Id, user.Role);
+
+        return new AuthPayload(UserResource.From(user), token);
     }
     public async Task VerifyAsync(string token, string otp)
     {

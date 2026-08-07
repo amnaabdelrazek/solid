@@ -17,9 +17,15 @@ public static class SessionSlice
         api.MapPost("/sessions", Create)
             .Accepts<CreateSessionRequest>("application/json", "application/x-www-form-urlencoded", "multipart/form-data");
         api.MapGet("/sessions/upcoming", Upcoming);
+        api.MapGet("/sessions/upcoming/individual", UpcomingIndividual);
+        api.MapGet("/sessions/upcoming/group", UpcomingGroup);
         api.MapGet("/sessions/upcoming/unpaid", UpcomingUnpaid);
+        api.MapGet("/sessions/upcoming/unpaid/individual", UpcomingUnpaidIndividual);
+        api.MapGet("/sessions/upcoming/unpaid/group", UpcomingUnpaidGroup);
         api.MapGet("/sessions/me", Upcoming);
         api.MapGet("/sessions/{sessionId:long}", Show);
+        api.MapGet("/sessions/attended", Attended);
+        api.MapGet("/sessions/{sessionId:long}/ratings", Ratings);
         api.MapPost("/sessions/{sessionId:long}/join", Join);
         api.MapPost("/sessions/{sessionId:long}/leave", Leave);
         api.MapPost("/sessions/{sessionId:long}/start", Start);
@@ -30,12 +36,80 @@ public static class SessionSlice
         return api;
     }
 
-    private static async Task<IResult> Index(IAuthContext auth, ISessionRepository sessionRepository, ISettingsRepository settingsRepository)
+    private static async Task<IResult> Index(
+        IAuthContext auth,
+        ISessionRepository sessionRepository,
+        ISettingsRepository settingsRepository,
+        int page = 1,
+        int pageSize = 10)
     {
-        var sessions = await sessionRepository.ListForUserAsync(auth.UserId, auth.Role);
+        if (page < 1)
+        {
+            page = 1;
+        }
+        if (pageSize < 1)
+        {
+            pageSize = 10;
+        }
+        if (pageSize > 100)
+        {
+            pageSize = 100;
+        }
+
+        var (sessions, totalCount) = await sessionRepository.ListForUserPaginatedAsync(auth.UserId, auth.Role, page, pageSize);
         var settingsAmount = await settingsRepository.GetAsync("general", "session_price");
         decimal.TryParse(settingsAmount, out var price);
-        return ApiResponse.Ok(new { sessions = sessions.Select(s => SessionResource.From(s, price)) });
+        long? userId = auth.IsAdminOrInstructor() ? null : auth.UserId;
+
+        return ApiResponse.Ok(new
+        {
+            sessions = sessions.Select(s => SessionResource.From(s, price, userId)),
+            pagination = new Dictionary<string, int>
+            {
+                { "current_page", page },
+                { "page_size", pageSize },
+                { "total_count", totalCount },
+                { "total_pages", (int)Math.Ceiling((double)totalCount / pageSize) }
+            }
+        });
+    }
+
+    private static async Task<IResult> Attended(
+        IAuthContext auth,
+        ISessionRepository sessionRepository,
+        ISettingsRepository settingsRepository,
+        int page = 1,
+        int pageSize = 10)
+    {
+        if (page < 1)
+        {
+            page = 1;
+        }
+        if (pageSize < 1)
+        {
+            pageSize = 10;
+        }
+        if (pageSize > 100)
+        {
+            pageSize = 100;
+        }
+
+        var (sessions, totalCount) = await sessionRepository.AttendedSessionsForUserPaginatedAsync(auth.UserId, page, pageSize);
+
+        var settingsAmount = await settingsRepository.GetAsync("general", "session_price");
+        decimal.TryParse(settingsAmount, out var price);
+
+        return ApiResponse.Ok(new
+        {
+            sessions = sessions.Select(s => AttendedSessionResource.From(s, auth.UserId, price)),
+            pagination = new Dictionary<string, int>
+            {
+                { "current_page", page },
+                { "page_size", pageSize },
+                { "total_count", totalCount },
+                { "total_pages", (int)Math.Ceiling((double)totalCount / pageSize) }
+            }
+        });
     }
 
     private static async Task<IResult> Create(
@@ -61,16 +135,28 @@ public static class SessionSlice
             return ApiResponse.Fail("Instructor is required.", StatusCodes.Status422UnprocessableEntity);
 
         var scheduledAtUtc = EgyptDateTime.ToUtcFromEgyptClock(request.scheduled_at);
+        var sessionType = NormalizeSessionType(request.session_type);
+
+        if (sessionType is null)
+            return ApiResponse.Fail("session_type must be either individual or group.", StatusCodes.Status422UnprocessableEntity);
+
+        var durationMinutes = sessionType == "individual"
+            ? (byte)20
+            : request.duration_minutes ?? 45;
+
+        var maxParticipants = sessionType == "individual"
+            ? 1
+            : Math.Min(request.max_participants ?? 15, 15);
 
         var result = await sessionRepository.CreateAsync(new SessionCreate(
             substanceCategoryId.Value,
             instructorId.Value,
             request.session_number,
             request.title,
-            request.session_type ?? "group",
+            sessionType,
             scheduledAtUtc,
-            request.duration_minutes ?? 45,
-            Math.Min(request.max_participants ?? 15, 15),
+            durationMinutes,
+            maxParticipants,
             request.metadata));
 
         if (result.Session is null)
@@ -94,26 +180,277 @@ public static class SessionSlice
             "Session created successfully.");
     }
 
-    private static async Task<IResult> Upcoming(
+    private static async Task<IResult> Ratings(
+    long sessionId,
     IAuthContext auth,
-    ISessionRepository sessionRepository,
-    ISettingsRepository settingsRepository)   // ADD THIS
+    ISessionRepository sessionRepository)
     {
-        var sessions = await sessionRepository.UpcomingPaidForUserAsync(auth.UserId);
+        var session = await sessionRepository.FindWithAttendeesAsync(sessionId);
+        if (session is null)
+            return ApiResponse.Fail("Not found.", StatusCodes.Status404NotFound);
+
+        // بس الأدمن أو الإنستركتور بتاع السيشن دي يقدر يشوف كل التقييمات
+        //if (!auth.IsAdminOrInstructor())
+        //    return ApiResponse.Fail("This action is unauthorized.", StatusCodes.Status403Forbidden);
+
+        //if (auth.IsInstructor() && session.InstructorId != auth.UserId)
+        //    return ApiResponse.Fail("This action is unauthorized.", StatusCodes.Status403Forbidden);
+
+        var ratedAttendances = session.Attendances
+            .Where(attendance => attendance.Rating.HasValue)
+            .OrderByDescending(attendance => attendance.UpdatedAt)
+            .ToList();
+
+        var ratings = ratedAttendances.Select(attendance => new
+        {
+            user_id = attendance.UserId,
+            user_name = attendance.User?.DisplayName,
+            rating = attendance.Rating,
+            comment = attendance.Comment,
+            rated_at = EgyptDateTime.Format(attendance.UpdatedAt)
+        });
+
+        double? averageRating = ratedAttendances.Count > 0
+            ? Math.Round(ratedAttendances.Average(attendance => (double)attendance.Rating!.Value), 2)
+            : null;
+
+        return ApiResponse.Ok(new
+        {
+            session_id = session.Id,
+            session_number = session.SessionNumber,
+            total_attendees = session.Attendances.Count(attendance => attendance.WasPresent),
+            total_ratings = ratedAttendances.Count,
+            average_rating = averageRating,
+            ratings
+        });
+    }
+
+    private static async Task<IResult> Upcoming(
+        IAuthContext auth,
+        ISessionRepository sessionRepository,
+        ISettingsRepository settingsRepository,
+        int page = 1,
+        int pageSize = 10)
+    {
+        if (page < 1)
+        {
+            page = 1;
+        }
+        if (pageSize < 1)
+        {
+            pageSize = 10;
+        }
+        if (pageSize > 100)
+        {
+            pageSize = 100;
+        }
+
+        var (sessions, totalCount) = await sessionRepository.UpcomingPaidForUserPaginatedAsync(auth.UserId, page: page, pageSize: pageSize);
         var settingsAmount = await settingsRepository.GetAsync("general", "session_price");
         decimal.TryParse(settingsAmount, out var price);
-        return ApiResponse.Ok(new { sessions = sessions.Select(s => SessionResource.From(s, price)) });
+        long? userId = auth.IsAdminOrInstructor() ? null : auth.UserId;
+
+        return ApiResponse.Ok(new
+        {
+            sessions = sessions.Select(s => SessionResource.From(s, price, userId)),
+            pagination = new Dictionary<string, int>
+            {
+                { "current_page", page },
+                { "page_size", pageSize },
+                { "total_count", totalCount },
+                { "total_pages", (int)Math.Ceiling((double)totalCount / pageSize) }
+            }
+        });
+    }
+
+    private static async Task<IResult> UpcomingIndividual(
+        IAuthContext auth,
+        ISessionRepository sessionRepository,
+        ISettingsRepository settingsRepository,
+        int page = 1,
+        int pageSize = 10)
+    {
+        if (page < 1)
+        {
+            page = 1;
+        }
+        if (pageSize < 1)
+        {
+            pageSize = 10;
+        }
+        if (pageSize > 100)
+        {
+            pageSize = 100;
+        }
+
+        var (sessions, totalCount) = await sessionRepository.UpcomingPaidForUserPaginatedAsync(auth.UserId, "individual", page, pageSize);
+        var settingsAmount = await settingsRepository.GetAsync("general", "session_price");
+        decimal.TryParse(settingsAmount, out var price);
+        long? userId = auth.IsAdminOrInstructor() ? null : auth.UserId;
+
+        return ApiResponse.Ok(new
+        {
+            sessions = sessions.Select(s => SessionResource.From(s, price, userId)),
+            pagination = new Dictionary<string, int>
+            {
+                { "current_page", page },
+                { "page_size", pageSize },
+                { "total_count", totalCount },
+                { "total_pages", (int)Math.Ceiling((double)totalCount / pageSize) }
+            }
+        });
+    }
+
+    private static async Task<IResult> UpcomingGroup(
+        IAuthContext auth,
+        ISessionRepository sessionRepository,
+        ISettingsRepository settingsRepository,
+        int page = 1,
+        int pageSize = 10)
+    {
+        if (page < 1)
+        {
+            page = 1;
+        }
+        if (pageSize < 1)
+        {
+            pageSize = 10;
+        }
+        if (pageSize > 100)
+        {
+            pageSize = 100;
+        }
+
+        var (sessions, totalCount) = await sessionRepository.UpcomingPaidForUserPaginatedAsync(auth.UserId, "group", page, pageSize);
+        var settingsAmount = await settingsRepository.GetAsync("general", "session_price");
+        decimal.TryParse(settingsAmount, out var price);
+        long? userId = auth.IsAdminOrInstructor() ? null : auth.UserId;
+
+        return ApiResponse.Ok(new
+        {
+            sessions = sessions.Select(s => SessionResource.From(s, price, userId)),
+            pagination = new Dictionary<string, int>
+            {
+                { "current_page", page },
+                { "page_size", pageSize },
+                { "total_count", totalCount },
+                { "total_pages", (int)Math.Ceiling((double)totalCount / pageSize) }
+            }
+        });
     }
 
     private static async Task<IResult> UpcomingUnpaid(
         IAuthContext auth,
         ISessionRepository sessionRepository,
-        ISettingsRepository settingsRepository)   // ADD THIS
+        ISettingsRepository settingsRepository,
+        int page = 1,
+        int pageSize = 10)
     {
-        var sessions = await sessionRepository.UpcomingUnpaidForUserAsync(auth.UserId);
+        if (page < 1)
+        {
+            page = 1;
+        }
+        if (pageSize < 1)
+        {
+            pageSize = 10;
+        }
+        if (pageSize > 100)
+        {
+            pageSize = 100;
+        }
+
+        var (sessions, totalCount) = await sessionRepository.UpcomingUnpaidForUserPaginatedAsync(auth.UserId, page: page, pageSize: pageSize);
         var settingsAmount = await settingsRepository.GetAsync("general", "session_price");
         decimal.TryParse(settingsAmount, out var price);
-        return ApiResponse.Ok(new { sessions = sessions.Select(s => SessionResource.From(s, price)) });
+        long? userId = auth.IsAdminOrInstructor() ? null : auth.UserId;
+
+        return ApiResponse.Ok(new
+        {
+            sessions = sessions.Select(s => SessionResource.From(s, price, userId)),
+            pagination = new Dictionary<string, int>
+            {
+                { "current_page", page },
+                { "page_size", pageSize },
+                { "total_count", totalCount },
+                { "total_pages", (int)Math.Ceiling((double)totalCount / pageSize) }
+            }
+        });
+    }
+
+    private static async Task<IResult> UpcomingUnpaidIndividual(
+        IAuthContext auth,
+        ISessionRepository sessionRepository,
+        ISettingsRepository settingsRepository,
+        int page = 1,
+        int pageSize = 10)
+    {
+        if (page < 1)
+        {
+            page = 1;
+        }
+        if (pageSize < 1)
+        {
+            pageSize = 10;
+        }
+        if (pageSize > 100)
+        {
+            pageSize = 100;
+        }
+
+        var (sessions, totalCount) = await sessionRepository.UpcomingUnpaidForUserPaginatedAsync(auth.UserId, "individual", page, pageSize);
+        var settingsAmount = await settingsRepository.GetAsync("general", "session_price");
+        decimal.TryParse(settingsAmount, out var price);
+        long? userId = auth.IsAdminOrInstructor() ? null : auth.UserId;
+
+        return ApiResponse.Ok(new
+        {
+            sessions = sessions.Select(s => SessionResource.From(s, price, userId)),
+            pagination = new Dictionary<string, int>
+            {
+                { "current_page", page },
+                { "page_size", pageSize },
+                { "total_count", totalCount },
+                { "total_pages", (int)Math.Ceiling((double)totalCount / pageSize) }
+            }
+        });
+    }
+
+    private static async Task<IResult> UpcomingUnpaidGroup(
+        IAuthContext auth,
+        ISessionRepository sessionRepository,
+        ISettingsRepository settingsRepository,
+        int page = 1,
+        int pageSize = 10)
+    {
+        if (page < 1)
+        {
+            page = 1;
+        }
+        if (pageSize < 1)
+        {
+            pageSize = 10;
+        }
+        if (pageSize > 100)
+        {
+            pageSize = 100;
+        }
+
+        var (sessions, totalCount) = await sessionRepository.UpcomingUnpaidForUserPaginatedAsync(auth.UserId, "group", page, pageSize);
+        var settingsAmount = await settingsRepository.GetAsync("general", "session_price");
+        decimal.TryParse(settingsAmount, out var price);
+        long? userId = auth.IsAdminOrInstructor() ? null : auth.UserId;
+
+        return ApiResponse.Ok(new
+        {
+            sessions = sessions.Select(s => SessionResource.From(s, price, userId)),
+            pagination = new Dictionary<string, int>
+            {
+                { "current_page", page },
+                { "page_size", pageSize },
+                { "total_count", totalCount },
+                { "total_pages", (int)Math.Ceiling((double)totalCount / pageSize) }
+            }
+        });
     }
 
     private static async Task<IResult> Show(
@@ -126,9 +463,10 @@ public static class SessionSlice
         var settingsAmount = await settingsRepository.GetAsync("general", "session_price");
         decimal.TryParse(settingsAmount, out var price);
 
+        long? userId = auth.IsAdminOrInstructor() ? null : auth.UserId;
         return session is null
             ? ApiResponse.Fail("Not found.", StatusCodes.Status404NotFound)
-            : ApiResponse.Ok(new { session = SessionResource.From(session, price) });
+            : ApiResponse.Ok(new { session = SessionResource.From(session, price, userId) });
     }
 
     // ── JOIN ─────────────────────────────────────────────────────────────────
@@ -310,6 +648,23 @@ public static class SessionSlice
         => configuration["Jaas:ServerUrl"]
            ?? configuration["Jitsi:ServerUrl"]
            ?? "https://8x8.vc";
+
+    private static string? NormalizeSessionType(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "group";
+        }
+
+        var normalized = value.Trim().ToLowerInvariant();
+
+        return normalized switch
+        {
+            "individual" or "single" or "one_to_one" or "one-to-one" or "فردي" or "فردية" => "individual",
+            "group" or "جماعي" or "جماعية" => "group",
+            _ => null
+        };
+    }
 
     private static object AttendanceResource(SessionAttendance attendance) => new
     {

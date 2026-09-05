@@ -12,6 +12,8 @@ public static class DatabaseSeeder
 {
     public static async Task SeedAsync(SolidDbContext db)
     {
+        await EnsureLookupDataAsync(db);
+
         // ── Instructors ──────────────────────────────────────────────
         User instructor1;
         if (!await db.Users.AnyAsync(u => u.MobileNumber == "+201000000001"))
@@ -130,14 +132,27 @@ public static class DatabaseSeeder
 
         await db.SaveChangesAsync();
 
+        // ── Lookup value IDs resolution ──────────────────────────────
+        var duration1To3 = (await db.LookupValues.FirstOrDefaultAsync(v => v.ValueKey == "1_3y"))?.Id ?? 3;
+        var duration6To12 = (await db.LookupValues.FirstOrDefaultAsync(v => v.ValueKey == "6_12m"))?.Id ?? 2;
+        var durationOver3 = (await db.LookupValues.FirstOrDefaultAsync(v => v.ValueKey == "over_3y"))?.Id ?? 4;
+
+        var eduUniversity = (await db.LookupValues.FirstOrDefaultAsync(v => v.ValueKey == "university"))?.Id ?? 8;
+        var eduSecondary = (await db.LookupValues.FirstOrDefaultAsync(v => v.ValueKey == "secondary"))?.Id ?? 7;
+        var eduPostgrad = (await db.LookupValues.FirstOrDefaultAsync(v => v.ValueKey == "postgraduate"))?.Id ?? 9;
+
+        var treatmentHospital = (await db.LookupValues.FirstOrDefaultAsync(v => v.ValueKey == "hospital"))?.Id ?? 10;
+        var treatmentOutpatient = (await db.LookupValues.FirstOrDefaultAsync(v => v.ValueKey == "outpatient"))?.Id ?? 11;
+        var treatmentSelf = (await db.LookupValues.FirstOrDefaultAsync(v => v.ValueKey == "self"))?.Id ?? 12;
+
         // ── Addiction profiles ────────────────────────────────────────
         if (!await db.AddictionProfiles.AnyAsync(p => p.UserId == addict1.Id))
         {
             db.AddictionProfiles.Add(new AddictionProfile
             {
                 UserId = addict1.Id,
-                AddictionDurationId = 3, // 1-3 years
-                EducationLevelId = 8,    // university
+                AddictionDurationId = duration1To3,
+                EducationLevelId = eduUniversity,
                 HadPriorTreatment = true,
                 AddictionReason = "ضغوط العمل والمشاكل الأسرية",
                 DaysClean = 45,
@@ -151,8 +166,8 @@ public static class DatabaseSeeder
             db.AddictionProfiles.Add(new AddictionProfile
             {
                 UserId = addict2.Id,
-                AddictionDurationId = 2, // 6-12 months
-                EducationLevelId = 7,    // secondary
+                AddictionDurationId = duration6To12,
+                EducationLevelId = eduSecondary,
                 HadPriorTreatment = false,
                 AddictionReason = "رفقاء السوء",
                 DaysClean = 10,
@@ -166,8 +181,8 @@ public static class DatabaseSeeder
             db.AddictionProfiles.Add(new AddictionProfile
             {
                 UserId = addict3.Id,
-                AddictionDurationId = 4, // over 3 years
-                EducationLevelId = 9,    // postgraduate
+                AddictionDurationId = durationOver3,
+                EducationLevelId = eduPostgrad,
                 HadPriorTreatment = true,
                 AddictionReason = "Stress and anxiety",
                 DaysClean = 120,
@@ -196,13 +211,13 @@ public static class DatabaseSeeder
         // ── User treatment types ──────────────────────────────────────
         if (!await db.UserTreatmentTypes.AnyAsync(ut => ut.UserId == addict1.Id))
         {
-            db.UserTreatmentTypes.Add(new UserTreatmentType { UserId = addict1.Id, LookupValueId = 10 }); // hospital
-            db.UserTreatmentTypes.Add(new UserTreatmentType { UserId = addict1.Id, LookupValueId = 11 }); // outpatient
+            db.UserTreatmentTypes.Add(new UserTreatmentType { UserId = addict1.Id, LookupValueId = treatmentHospital });
+            db.UserTreatmentTypes.Add(new UserTreatmentType { UserId = addict1.Id, LookupValueId = treatmentOutpatient });
         }
 
         if (!await db.UserTreatmentTypes.AnyAsync(ut => ut.UserId == addict2.Id))
         {
-            db.UserTreatmentTypes.Add(new UserTreatmentType { UserId = addict2.Id, LookupValueId = 12 }); // self
+            db.UserTreatmentTypes.Add(new UserTreatmentType { UserId = addict2.Id, LookupValueId = treatmentSelf });
         }
 
         await db.SaveChangesAsync();
@@ -507,5 +522,78 @@ public static class DatabaseSeeder
         }
 
         await db.SaveChangesAsync();
+    }
+
+    private static async Task EnsureLookupDataAsync(SolidDbContext db)
+    {
+        var seededAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        if (!await db.LookupTypes.AnyAsync())
+        {
+            db.LookupTypes.AddRange(
+                new LookupType { Key = "addiction_duration", LabelAr = "مدة الإدمان", LabelEn = "Addiction Duration", CreatedAt = seededAt, UpdatedAt = seededAt },
+                new LookupType { Key = "education_level", LabelAr = "المستوى التعليمي", LabelEn = "Education Level", CreatedAt = seededAt, UpdatedAt = seededAt },
+                new LookupType { Key = "treatment_type", LabelAr = "نوع العلاج", LabelEn = "Treatment Type", CreatedAt = seededAt, UpdatedAt = seededAt }
+            );
+            await db.SaveChangesAsync();
+        }
+
+        var durationType = await db.LookupTypes.FirstAsync(t => t.Key == "addiction_duration");
+        var eduType = await db.LookupTypes.FirstAsync(t => t.Key == "education_level");
+        var treatmentType = await db.LookupTypes.FirstAsync(t => t.Key == "treatment_type");
+
+        if (!await db.LookupValues.AnyAsync())
+        {
+            db.LookupValues.AddRange(
+                new LookupValue { LookupTypeId = durationType.Id, ValueKey = "less_6m", LabelAr = "أقل من 6 أشهر", LabelEn = "Less than 6 months", SortOrder = 1, IsActive = true, CreatedAt = seededAt, UpdatedAt = seededAt },
+                new LookupValue { LookupTypeId = durationType.Id, ValueKey = "6_12m", LabelAr = "6 - 12 شهر", LabelEn = "6 - 12 months", SortOrder = 2, IsActive = true, CreatedAt = seededAt, UpdatedAt = seededAt },
+                new LookupValue { LookupTypeId = durationType.Id, ValueKey = "1_3y", LabelAr = "1 - 3 سنوات", LabelEn = "1 - 3 years", SortOrder = 3, IsActive = true, CreatedAt = seededAt, UpdatedAt = seededAt },
+                new LookupValue { LookupTypeId = durationType.Id, ValueKey = "over_3y", LabelAr = "أكثر من 3 سنوات", LabelEn = "Over 3 years", SortOrder = 4, IsActive = true, CreatedAt = seededAt, UpdatedAt = seededAt },
+                new LookupValue { LookupTypeId = eduType.Id, ValueKey = "none", LabelAr = "بدون تعليم", LabelEn = "No Education", SortOrder = 1, IsActive = true, CreatedAt = seededAt, UpdatedAt = seededAt },
+                new LookupValue { LookupTypeId = eduType.Id, ValueKey = "primary", LabelAr = "ابتدائي", LabelEn = "Primary", SortOrder = 2, IsActive = true, CreatedAt = seededAt, UpdatedAt = seededAt },
+                new LookupValue { LookupTypeId = eduType.Id, ValueKey = "secondary", LabelAr = "ثانوي", LabelEn = "Secondary", SortOrder = 3, IsActive = true, CreatedAt = seededAt, UpdatedAt = seededAt },
+                new LookupValue { LookupTypeId = eduType.Id, ValueKey = "university", LabelAr = "جامعي", LabelEn = "University", SortOrder = 4, IsActive = true, CreatedAt = seededAt, UpdatedAt = seededAt },
+                new LookupValue { LookupTypeId = eduType.Id, ValueKey = "postgraduate", LabelAr = "دراسات عليا", LabelEn = "Postgraduate", SortOrder = 5, IsActive = true, CreatedAt = seededAt, UpdatedAt = seededAt },
+                new LookupValue { LookupTypeId = treatmentType.Id, ValueKey = "hospital", LabelAr = "علاج في المستشفى", LabelEn = "Hospital Treatment", SortOrder = 1, IsActive = true, CreatedAt = seededAt, UpdatedAt = seededAt },
+                new LookupValue { LookupTypeId = treatmentType.Id, ValueKey = "outpatient", LabelAr = "علاج خارجي", LabelEn = "Outpatient", SortOrder = 2, IsActive = true, CreatedAt = seededAt, UpdatedAt = seededAt },
+                new LookupValue { LookupTypeId = treatmentType.Id, ValueKey = "self", LabelAr = "علاج ذاتي", LabelEn = "Self Treatment", SortOrder = 3, IsActive = true, CreatedAt = seededAt, UpdatedAt = seededAt },
+                new LookupValue { LookupTypeId = treatmentType.Id, ValueKey = "religious", LabelAr = "علاج ديني", LabelEn = "Religious", SortOrder = 4, IsActive = true, CreatedAt = seededAt, UpdatedAt = seededAt }
+            );
+            await db.SaveChangesAsync();
+        }
+
+        if (!await db.SubstanceCategories.AnyAsync())
+        {
+            db.SubstanceCategories.AddRange(
+                new SubstanceCategory { Slug = "depressants", NameAr = "المثبطات", NameEn = "Depressants", IsActive = true, SortOrder = 1, CreatedAt = seededAt, UpdatedAt = seededAt },
+                new SubstanceCategory { Slug = "sedatives", NameAr = "المهدئات", NameEn = "Sedatives", IsActive = true, SortOrder = 2, CreatedAt = seededAt, UpdatedAt = seededAt },
+                new SubstanceCategory { Slug = "stimulants", NameAr = "المنشطات", NameEn = "Stimulants", IsActive = true, SortOrder = 3, CreatedAt = seededAt, UpdatedAt = seededAt },
+                new SubstanceCategory { Slug = "hallucinogens", NameAr = "المهلوسات", NameEn = "Hallucinogens", IsActive = true, SortOrder = 4, CreatedAt = seededAt, UpdatedAt = seededAt }
+            );
+            await db.SaveChangesAsync();
+        }
+
+        if (!await db.Substances.AnyAsync())
+        {
+            var depressants = await db.SubstanceCategories.FirstAsync(c => c.Slug == "depressants");
+            var sedatives = await db.SubstanceCategories.FirstAsync(c => c.Slug == "sedatives");
+            var stimulants = await db.SubstanceCategories.FirstAsync(c => c.Slug == "stimulants");
+            var hallucinogens = await db.SubstanceCategories.FirstAsync(c => c.Slug == "hallucinogens");
+
+            db.Substances.AddRange(
+                new Substance { SubstanceCategoryId = depressants.Id, NameAr = "حشيش", NameEn = "Hash", IsActive = true, CreatedAt = seededAt, UpdatedAt = seededAt },
+                new Substance { SubstanceCategoryId = depressants.Id, NameAr = "بانجو", NameEn = "Bango", IsActive = true, CreatedAt = seededAt, UpdatedAt = seededAt },
+                new Substance { SubstanceCategoryId = depressants.Id, NameAr = "هيدرا", NameEn = "Hydra", IsActive = true, CreatedAt = seededAt, UpdatedAt = seededAt },
+                new Substance { SubstanceCategoryId = sedatives.Id, NameAr = "أفيون", NameEn = "Opium", IsActive = true, CreatedAt = seededAt, UpdatedAt = seededAt },
+                new Substance { SubstanceCategoryId = sedatives.Id, NameAr = "ترامادول", NameEn = "Tramadol", IsActive = true, CreatedAt = seededAt, UpdatedAt = seededAt },
+                new Substance { SubstanceCategoryId = sedatives.Id, NameAr = "هيروين", NameEn = "Heroin", IsActive = true, CreatedAt = seededAt, UpdatedAt = seededAt },
+                new Substance { SubstanceCategoryId = stimulants.Id, NameAr = "شابو", NameEn = "Shabu", IsActive = true, CreatedAt = seededAt, UpdatedAt = seededAt },
+                new Substance { SubstanceCategoryId = stimulants.Id, NameAr = "كوكايين", NameEn = "Cocaine", IsActive = true, CreatedAt = seededAt, UpdatedAt = seededAt },
+                new Substance { SubstanceCategoryId = stimulants.Id, NameAr = "إكستاسي", NameEn = "Ecstasy", IsActive = true, CreatedAt = seededAt, UpdatedAt = seededAt },
+                new Substance { SubstanceCategoryId = hallucinogens.Id, NameAr = "إل إس دي", NameEn = "LSD", IsActive = true, CreatedAt = seededAt, UpdatedAt = seededAt },
+                new Substance { SubstanceCategoryId = hallucinogens.Id, NameAr = "آيس", NameEn = "Ice (Crystal Meth)", IsActive = true, CreatedAt = seededAt, UpdatedAt = seededAt }
+            );
+            await db.SaveChangesAsync();
+        }
     }
 }

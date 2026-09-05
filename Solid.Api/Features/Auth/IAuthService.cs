@@ -4,7 +4,7 @@ public interface IAuthService
 {
     Task<AuthPayload> RegisterAsync(RegisterRequest request);
 
-    Task VerifyAsync(string token, string otp);
+    Task<AuthPayload> VerifyAsync(string token, string otp);
 
     Task<AuthPayload?> LoginAsync(LoginRequest request);
 

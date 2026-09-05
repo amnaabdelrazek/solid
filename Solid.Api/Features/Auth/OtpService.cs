@@ -1,297 +1,134 @@
-////using Solid.Api.Database.Repositories;
-////using Solid.Api.Infrastructure.Sms;
-
-////namespace Solid.Api.Features.Auth;
-
-////public sealed class OtpService(
-////    IAuthRepository authRepository,
-////    ISmsSender smsSender,
-////    IConfiguration configuration,
-////    ILogger<OtpService> logger)
-////    : IOtpService
-////{
-////    public async Task SendRegistrationOtpAsync(
-////        string? mobileNumber)
-////    {
-////        if (string.IsNullOrWhiteSpace(mobileNumber))
-////        {
-////            throw new InvalidOperationException(
-////                "User has no mobile number.");
-////        }
-
-////        if (TryUseFixedOtp(out var fixedOtp))
-////        {
-////            logger.LogWarning("DEV FIXED OTP for registration mobile {MobileNumber}: {Otp}", mobileNumber, fixedOtp);
-
-////            return;
-////        }
-
-////        await smsSender.SendOtpAsync(mobileNumber);
-////    }
-
-////    public async Task<bool> VerifyRegistrationOtpAsync(
-////        string? mobileNumber,
-////        string otp)
-////    {
-////        if (string.IsNullOrWhiteSpace(mobileNumber))
-////        {
-////            return false;
-////        }
-
-////        if (TryUseFixedOtp(out var fixedOtp))
-////        {
-////            return string.Equals(otp, fixedOtp, StringComparison.Ordinal);
-////        }
-
-////        return await smsSender.VerifyOtpAsync(
-////            mobileNumber,
-////            otp);
-////    }
-
-////    public async Task SendPasswordResetOtpAsync(
-////        long userId,
-////        string? mobileNumber)
-////    {
-////        if (string.IsNullOrWhiteSpace(mobileNumber))
-////        {
-////            throw new InvalidOperationException(
-////                "User has no mobile number.");
-////        }
-
-////        if (TryUseFixedOtp(out var fixedOtp))
-////        {
-////            logger.LogWarning("DEV FIXED OTP for password reset user {UserId}: {Otp}", userId, fixedOtp);
-
-////            return;
-////        }
-
-////        await smsSender.SendOtpAsync(mobileNumber);
-////    }
-
-////    public async Task<bool> VerifyPasswordResetOtpAsync(
-////        string userId,
-////        string otp)
-////    {
-////        if (!long.TryParse(userId, out var id))
-////        {
-////            return false;
-////        }
-
-////        var user = await authRepository.FindUserByIdAsync(id);
-
-////        if (user is null)
-////        {
-////            return false;
-////        }
-
-////        if (string.IsNullOrWhiteSpace(user.MobileNumber))
-////        {
-////            return false;
-////        }
-
-////        if (TryUseFixedOtp(out var fixedOtp))
-////        {
-////            return string.Equals(otp, fixedOtp, StringComparison.Ordinal);
-////        }
-
-////        return await smsSender.VerifyOtpAsync(
-////            user.MobileNumber,
-////            otp);
-////    }
-
-////    private bool TryUseFixedOtp(out string fixedOtp)
-////    {
-////        fixedOtp = configuration["Otp:FixedCode"] ?? string.Empty;
-
-////        return configuration.GetValue<bool>("Otp:UseFixedCode") &&
-////               !string.IsNullOrWhiteSpace(fixedOtp);
-////    }
-////}
-
-//using Microsoft.Extensions.Caching.Memory;
-//using Solid.Api.Infrastructure.Sms;
-
-//namespace Solid.Api.Features.Auth;
-
-//public sealed class OtpService(
-//    IMemoryCache cache,
-//    ISmsSender smsSender,
-//    ILogger<OtpService> logger)
-//    : IOtpService
-//{
-//    private const string Prefix = "otp:";
-
-//    public async Task SendRegistrationOtpAsync(string? mobileNumber)
-//    {
-//        if (string.IsNullOrWhiteSpace(mobileNumber))
-//            throw new InvalidOperationException("Mobile number is required");
-
-//        var otp = GenerateOtp();
-
-//        cache.Set($"{Prefix}{mobileNumber}", otp, TimeSpan.FromMinutes(5));
-
-//        logger.LogInformation("OTP for {Mobile}: {Otp}", mobileNumber, otp);
-
-//        await smsSender.SendAsync(
-//            mobileNumber,
-//            $"Your verification code is: {otp}");
-//    }
-
-//    public Task<bool> VerifyRegistrationOtpAsync(string? mobileNumber, string otp)
-//    {
-//        if (string.IsNullOrWhiteSpace(mobileNumber))
-//            return Task.FromResult(false);
-
-//        var key = $"{Prefix}{mobileNumber}";
-
-//        if (!cache.TryGetValue<string>(key, out var storedOtp))
-//            return Task.FromResult(false);
-
-//        var isValid = storedOtp == otp;
-
-//        if (isValid)
-//            cache.Remove(key);
-
-//        return Task.FromResult(isValid);
-//    }
-
-//    public async Task SendPasswordResetOtpAsync(long userId, string? mobileNumber)
-//    {
-//        if (string.IsNullOrWhiteSpace(mobileNumber))
-//            throw new InvalidOperationException("Mobile number is required");
-
-//        var otp = GenerateOtp();
-
-//        cache.Set($"{Prefix}reset:{userId}", otp, TimeSpan.FromMinutes(5));
-
-//        await smsSender.SendAsync(
-//            mobileNumber,
-//            $"Your reset code is: {otp}");
-//    }
-
-//    public Task<bool> VerifyPasswordResetOtpAsync(string userId, string otp)
-//    {
-//        if (!long.TryParse(userId, out var id))
-//            return Task.FromResult(false);
-
-//        var key = $"{Prefix}reset:{id}";
-
-//        if (!cache.TryGetValue<string>(key, out var storedOtp))
-//            return Task.FromResult(false);
-
-//        var isValid = storedOtp == otp;
-
-//        if (isValid)
-//            cache.Remove(key);
-
-//        return Task.FromResult(isValid);
-//    }
-
-//    private static string GenerateOtp()
-//        => Random.Shared.Next(100000, 999999).ToString();
-//}
-
-
-using System.Net.Http.Json;
+using Solid.Api.Common;
+using Twilio;
+using Twilio.Exceptions;
+using Twilio.Rest.Verify.V2.Service;
 
 namespace Solid.Api.Infrastructure.Sms;
 
 public sealed class OtpService(
-    HttpClient httpClient,
     IConfiguration configuration,
     ILogger<OtpService> logger) : IOtpService
 {
-    private readonly string _baseUrl = configuration["Sms:Infobip:BaseUrl"]!.TrimEnd('/');
-    private readonly string _apiKey = configuration["Sms:Infobip:ApiKey"]!;
-    private readonly string _applicationId = configuration["Sms:Infobip:ApplicationId"]!;
-    private readonly string _messageId = configuration["Sms:Infobip:MessageId"]!;
+    private readonly string _accountSid = configuration["Sms:Twilio:AccountSid"] ?? string.Empty;
+    private readonly string _authToken = configuration["Sms:Twilio:AuthToken"] ?? string.Empty;
+    private readonly string _serviceSid = configuration["Sms:Twilio:VerifyServiceSid"] ?? string.Empty;
+    private readonly string _channel = configuration["Sms:Twilio:Channel"] ?? "whatsapp";
 
-    //public async Task<string> StartRegistrationOtpAsync(string mobileNumber)
-    //{
-    //    var url = $"{_baseUrl}/2fa/2/pin";
-
-    //    var body = new
-    //    {
-    //        applicationId = _applicationId,
-    //        messageId = _messageId,
-    //        from = "SOLID",
-    //        to = mobileNumber
-    //    };
-
-    //    var result = await SendAsync<StartOtpResponse>(url, body, throwOnError: true);
-
-    //    if (string.IsNullOrWhiteSpace(result?.PinId))
-    //    {
-    //        logger.LogError("Failed to start OTP for {Mobile}", mobileNumber);
-    //        throw new InvalidOperationException("OTP service failed");
-    //    }
-
-    //    return result.PinId;
-    //}
-
-
-
-    public Task<string> StartRegistrationOtpAsync(string mobileNumber)
+    public async Task<string> StartRegistrationOtpAsync(string mobileNumber)
     {
-        logger.LogWarning(
-            "DEV MODE OTP for {Mobile}: 111111",
-            mobileNumber);
+        var normalizedPhoneNumber = NormalizePhoneNumber(mobileNumber);
 
-        return Task.FromResult(Guid.NewGuid().ToString());
+        if (TryUseFixedCode(out var fixedCode))
+        {
+            logger.LogWarning("DEV MODE registration OTP for {MobileNumber}: {Otp}", normalizedPhoneNumber, fixedCode);
+
+            return $"local:{normalizedPhoneNumber}";
+        }
+
+        EnsureTwilioConfigured();
+
+        try
+        {
+            TwilioClient.Init(_accountSid, _authToken);
+
+            var verification = await VerificationResource.CreateAsync(
+                to: normalizedPhoneNumber,
+                channel: _channel,
+                pathServiceSid: _serviceSid);
+
+            return verification.Sid;
+        }
+        catch (ApiException exception)
+        {
+            throw new InvalidOperationException(
+                $"OTP provider rejected the request: {exception.Message}",
+                exception);
+        }
     }
 
-    //public async Task<bool> VerifyRegistrationOtpAsync(string pinId, string code)
-    //{
-    //    var url = $"{_baseUrl}/2fa/2/pin/{pinId}/verify";
-
-    //    var response = await SendAsync<object>(url, new { pin = code }, throwOnError: false);
-
-    //    return response != null;
-    //}
-
-
-    public Task<bool> VerifyRegistrationOtpAsync(string pinId, string code)
+    public async Task<bool> VerifyRegistrationOtpAsync(string mobileNumber, string code)
     {
-        return Task.FromResult(code == "111111");
+        var normalizedPhoneNumber = NormalizePhoneNumber(mobileNumber);
+
+        if (TryUseFixedCode(out var fixedCode))
+        {
+            return string.Equals(code, fixedCode, StringComparison.Ordinal);
+        }
+
+        return await VerifyOtpAsync(normalizedPhoneNumber, code);
     }
 
     public Task<string> SendPasswordResetOtpAsync(long userId, string mobileNumber)
-        => StartRegistrationOtpAsync(mobileNumber);
-
-    //public Task<bool> VerifyPasswordResetOtpAsync(string pinId, string code)
-    //    => VerifyRegistrationOtpAsync(pinId, code);
-
-
-    public Task<bool> VerifyPasswordResetOtpAsync(string pinId, string code)
     {
-        return Task.FromResult(code == "111111");
+        return StartRegistrationOtpAsync(mobileNumber);
     }
 
-    private async Task<T?> SendAsync<T>(string url, object body, bool throwOnError)
+    public async Task<bool> VerifyPasswordResetOtpAsync(string mobileNumber, string code)
     {
-        var request = new HttpRequestMessage(HttpMethod.Post, url);
-        request.Content = JsonContent.Create(body);
+        var normalizedPhoneNumber = NormalizePhoneNumber(mobileNumber);
 
-        var response = await httpClient.SendAsync(request);
-        var content = await response.Content.ReadAsStringAsync();
-
-        if (!response.IsSuccessStatusCode)
+        if (TryUseFixedCode(out var fixedCode))
         {
-            logger.LogError("Infobip error ({StatusCode}): {Error}", response.StatusCode, content);
-
-            if (throwOnError)
-            {
-                throw new InvalidOperationException($"Infobip error ({(int)response.StatusCode}): {content}");
-            }
-
-            return default;
+            return string.Equals(code, fixedCode, StringComparison.Ordinal);
         }
 
-        return await response.Content.ReadFromJsonAsync<T>();
+        return await VerifyOtpAsync(normalizedPhoneNumber, code);
     }
 
-    private class StartOtpResponse
+    private async Task<bool> VerifyOtpAsync(string normalizedPhoneNumber, string code)
     {
-        public string PinId { get; set; } = default!;
+        EnsureTwilioConfigured();
+
+        try
+        {
+            TwilioClient.Init(_accountSid, _authToken);
+
+            var result = await VerificationCheckResource.CreateAsync(
+                to: normalizedPhoneNumber,
+                code: code,
+                pathServiceSid: _serviceSid);
+
+            return string.Equals(result.Status, "approved", StringComparison.OrdinalIgnoreCase);
+        }
+        catch (ApiException exception)
+        {
+            logger.LogWarning(
+                exception,
+                "OTP verification failed for {MobileNumber}: {Message}",
+                normalizedPhoneNumber,
+                exception.Message);
+
+            return false;
+        }
+    }
+
+    private string NormalizePhoneNumber(string mobileNumber)
+    {
+        if (!PhoneNumberValidator.TryNormalize(mobileNumber, out var normalizedPhoneNumber) ||
+            string.IsNullOrWhiteSpace(normalizedPhoneNumber))
+        {
+            throw new InvalidOperationException(PhoneNumberValidator.Message);
+        }
+
+        return normalizedPhoneNumber;
+    }
+
+    private void EnsureTwilioConfigured()
+    {
+        if (string.IsNullOrWhiteSpace(_accountSid) ||
+            string.IsNullOrWhiteSpace(_authToken) ||
+            string.IsNullOrWhiteSpace(_serviceSid))
+        {
+            throw new InvalidOperationException(
+                "Twilio Verify is not configured. Set Sms:Twilio:AccountSid, Sms:Twilio:AuthToken, and Sms:Twilio:VerifyServiceSid.");
+        }
+    }
+
+    private bool TryUseFixedCode(out string fixedCode)
+    {
+        fixedCode = configuration["Otp:FixedCode"] ?? string.Empty;
+
+        return configuration.GetValue<bool>("Otp:UseFixedCode") &&
+               !string.IsNullOrWhiteSpace(fixedCode);
     }
 }

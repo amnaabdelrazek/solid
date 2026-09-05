@@ -311,20 +311,8 @@ builder.Services.AddSignalR();
 builder.Services.AddHttpClient();
 #endregion
 
-#region SMS + OTP (Infobip 2FA)
-builder.Services.AddHttpClient<IOtpService, OtpService>((sp, client) =>
-{
-    var config = sp.GetRequiredService<IConfiguration>();
-
-    var baseUrl = config["Sms:Infobip:BaseUrl"];
-    var apiKey = config["Sms:Infobip:ApiKey"];
-
-    if (string.IsNullOrWhiteSpace(baseUrl) || string.IsNullOrWhiteSpace(apiKey))
-        throw new InvalidOperationException("Infobip config missing");
-
-    client.BaseAddress = new Uri(baseUrl);
-    client.DefaultRequestHeaders.Add("Authorization", $"App {apiKey}");
-});
+#region SMS + OTP (Twilio Verify)
+builder.Services.AddScoped<IOtpService, OtpService>();
 #endregion
 
 #region Firebase (Cloud Messaging push notifications)
@@ -456,6 +444,15 @@ if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<SolidDbContext>();
+    try
+    {
+        await dbContext.Database.MigrateAsync();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[Seeder] Migration notice: {ex.Message}");
+    }
+
     await DatabaseSeeder.SeedAsync(dbContext);
 }
 #endregion

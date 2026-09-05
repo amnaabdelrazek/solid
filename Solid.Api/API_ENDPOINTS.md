@@ -55,7 +55,7 @@ Bearer <token>
 
 - SQL Server database `Solid` is required for almost every endpoint.
 - `Otp:TtlSeconds` controls how long an OTP stays valid; default is `300` seconds.
-- Twilio SMS credentials are required for real OTP delivery: `Sms:Twilio:AccountSid`, `Sms:Twilio:AuthToken`, and `Sms:Twilio:From`.
+- Twilio Verify credentials are required for real WhatsApp OTP delivery: `Sms:Twilio:AccountSid`, `Sms:Twilio:AuthToken`, `Sms:Twilio:VerifyServiceSid`, and `Sms:Twilio:Channel` set to `whatsapp`.
 - `Jitsi:ServerUrl` is required for real session joining/start links.
 - Payment gateways are not fully wired in `Solid.Api`; the old Laravel webhook route exists in Laravel but not in the .NET API.
 - FCM is temporarily disabled in `Modules/Notifications/Services/PushNotificationService.php`.
@@ -138,7 +138,7 @@ Success body:
     "preferred_language": "ar",
     "is_active": false
   },
-  "token": "<jwt>",
+  "token": "<temporary_registration_token>",
   "token_type": "Bearer"
 }
 ```
@@ -155,14 +155,23 @@ Request:
 
 ```json
 {
-  "otp": "<sms_otp>"
+  "otp": "<whatsapp_otp>"
 }
 ```
 
 Success body:
 
 ```json
-{}
+{
+  "user": {
+    "id": 1,
+    "display_name": "Ahmed Hassan",
+    "mobile_number": "+201001234567",
+    "role": "addict"
+  },
+  "token": "<jwt>",
+  "token_type": "Bearer"
+}
 ```
 
 ### POST `/api/auth/login`
@@ -216,7 +225,7 @@ Request:
 ```json
 {
   "token": "<password_reset_token>",
-  "otp": "<sms_otp>"
+  "otp": "<whatsapp_otp>"
 }
 ```
 

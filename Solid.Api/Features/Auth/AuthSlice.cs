@@ -129,16 +129,23 @@ public static class AuthSlice
         if (string.IsNullOrWhiteSpace(request.otp))
             return ApiResponse.Fail("OTP is required.", StatusCodes.Status422UnprocessableEntity);
 
+        AuthPayload authPayload;
         try
         {
-            await authService.VerifyAsync(token, request.otp);
+            authPayload = await authService.VerifyAsync(token, request.otp);
+        }
+        catch (InvalidOperationException exception)
+        {
+            return SmsFailure(exception);
         }
         catch
         {
             return ApiResponse.Fail("Invalid OTP provided.", StatusCodes.Status422UnprocessableEntity);
         }
 
-        return ApiResponse.Ok(message: "Registration successful.");
+        return ApiResponse.Ok(
+            new { user = authPayload.User, token = authPayload.Token, token_type = authPayload.TokenType },
+            "Registration successful.");
     }
 
     //private static async Task<IResult> Login(LoginRequest request, IAuthService authService)
@@ -298,7 +305,9 @@ public static class AuthSlice
                          exception.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase) ||
                          exception.Message.Contains("E.164", StringComparison.OrdinalIgnoreCase) ||
                          exception.Message.Contains("SMS provider rejected", StringComparison.OrdinalIgnoreCase) ||
-                         exception.Message.StartsWith("SMS is not configured", StringComparison.OrdinalIgnoreCase)
+                         exception.Message.Contains("OTP provider rejected", StringComparison.OrdinalIgnoreCase) ||
+                         exception.Message.StartsWith("SMS is not configured", StringComparison.OrdinalIgnoreCase) ||
+                         exception.Message.StartsWith("Twilio Verify is not configured", StringComparison.OrdinalIgnoreCase)
             ? StatusCodes.Status422UnprocessableEntity
             : StatusCodes.Status502BadGateway;
 

@@ -146,7 +146,7 @@ public static class SessionSlice
 
         var maxParticipants = sessionType == "individual"
             ? 1
-            : Math.Min(request.max_participants ?? 15, 15);
+            : request.max_participants ?? 15;
 
         var result = await sessionRepository.CreateAsync(new SessionCreate(
             substanceCategoryId.Value,

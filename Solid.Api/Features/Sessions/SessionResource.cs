@@ -73,7 +73,7 @@ public static class SessionResource
         }
 
         return metadataMaxParticipants is > 0
-            ? Math.Min(metadataMaxParticipants.Value, 15)
+            ? metadataMaxParticipants.Value
             : 15;
     }
 }

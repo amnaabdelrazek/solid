@@ -822,7 +822,7 @@ public sealed class SessionRepository(SolidDbContext dbContext) : ISessionReposi
             int.TryParse(Convert.ToString(value), out var maxParticipants) &&
             maxParticipants > 0)
         {
-            return Math.Min(maxParticipants, MaxSessionParticipants);
+            return maxParticipants;
         }
 
         return MaxSessionParticipants;

@@ -13,6 +13,7 @@ public static class PaymentSlice
     public static IEndpointRouteBuilder MapPaymentSlice(this IEndpointRouteBuilder api)
     {
         api.MapPost("/payments/initiate/{sessionId:long}", Initiate);
+        api.MapPost("/payments/instapay/{sessionId:long}", ConfirmInstapay);
         api.MapGet("/payments/success", Success).AllowAnonymous();
         api.MapGet("/payments/cancel", Cancel).AllowAnonymous();
         api.MapGet("/payments/history", History);
@@ -249,6 +250,38 @@ public static class PaymentSlice
         }
 
         return $"{request.Scheme}://{request.Host}".TrimEnd('/');
+    }
+
+    private static async Task<IResult> ConfirmInstapay(
+        long sessionId,
+        IAuthContext auth,
+        ISettingsRepository settingsRepository,
+        IPaymentRepository paymentRepository,
+        ISessionRepository sessionRepository,
+        INotificationService notificationService)
+    {
+        var bookingValidation = await sessionRepository.ValidateBookingAsync(sessionId, auth.UserId);
+        if (!bookingValidation.Success)
+            return ApiResponse.Fail(bookingValidation.Error ?? "Unable to book session.", bookingValidation.StatusCode);
+
+        var settingsAmount = await settingsRepository.GetAsync("general", "session_price");
+        decimal.TryParse(settingsAmount, out var amount);
+        if (amount <= 0)
+        {
+            amount = 1200;
+        }
+
+        var payment = await paymentRepository.CreatePaidAsync(auth.UserId, sessionId, amount, "instapay");
+
+        await NotifyPaymentPaidAsync(notificationService, payment);
+
+        return ApiResponse.Ok(new
+        {
+            payment_id = payment.Id,
+            session_id = sessionId,
+            amount = payment.Amount,
+            status = payment.Status
+        }, "InstaPay payment confirmed successfully.");
     }
 
     private static Task NotifyPaymentPaidAsync(INotificationService notificationService, Database.Entities.Payment payment)

@@ -5,6 +5,7 @@ namespace Solid.Api.Database.Repositories;
 public interface IPaymentRepository
 {
     Task<Payment> CreatePendingAsync(long userId, long sessionId, decimal amount);
+    Task<Payment> CreatePaidAsync(long userId, long sessionId, decimal amount, string gateway, string? transactionId = null);
 
     Task<IReadOnlyList<Payment>> HistoryAsync(long userId);
 

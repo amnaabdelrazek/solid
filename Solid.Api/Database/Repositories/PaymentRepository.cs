@@ -27,6 +27,29 @@ public sealed class PaymentRepository(SolidDbContext dbContext) : IPaymentReposi
         return payment;
     }
 
+    public async Task<Payment> CreatePaidAsync(long userId, long sessionId, decimal amount, string gateway, string? transactionId = null)
+    {
+        var now = DateTime.UtcNow;
+        var payment = new Payment
+        {
+            UserId = userId,
+            SessionId = sessionId,
+            Amount = amount,
+            Currency = "EGP",
+            Status = "paid",
+            Gateway = gateway,
+            GatewayTransactionId = transactionId ?? Guid.NewGuid().ToString(),
+            PaidAt = now,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        dbContext.Payments.Add(payment);
+        await dbContext.SaveChangesAsync();
+
+        return payment;
+    }
+
     public async Task<IReadOnlyList<Payment>> HistoryAsync(long userId)
     {
         return await dbContext.Payments
